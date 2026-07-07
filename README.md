@@ -17,17 +17,23 @@ Automate approval flow.
 > (localhost / `file://`) it falls back to bundled seed JSON. The only
 > host-aware code lives in [`app/js/spconfig.js`](app/js/spconfig.js).
 
+> **This README is self-contained** — the architecture diagrams, full deployment
+> steps, and the modern-page embedding guide are all inline below. The `docs/`
+> files hold the same content if you prefer them standalone.
+
 ---
 
-## Contents
+## Table of contents
 
-| Doc | What it covers |
-|---|---|
-| [docs/FLOW-DIAGRAM.md](docs/FLOW-DIAGRAM.md) | Architecture & data-flow diagrams (Mermaid) |
-| [docs/SHAREPOINT-DEPLOYMENT.md](docs/SHAREPOINT-DEPLOYMENT.md) | Step-by-step SharePoint Online deployment |
-| [docs/EMBED-IN-MODERN-PAGES.md](docs/EMBED-IN-MODERN-PAGES.md) | *(Optional)* Embedding the app in a SharePoint modern page |
-| [PHASE-1-PLAN-AND-ARCHITECTURE.md](PHASE-1-PLAN-AND-ARCHITECTURE.md) | Full architecture, data model & governance plan |
-| [PHASE-2-PROTOTYPE-RUNBOOK.md](PHASE-2-PROTOTYPE-RUNBOOK.md) | Detailed GUI-first prototype stand-up runbook |
+1. [Features](#features)
+2. [The six SharePoint lists](#the-six-sharepoint-lists)
+3. [Repository layout](#repository-layout)
+4. [Run locally](#run-locally)
+5. [Architecture & flow diagrams](#architecture--flow-diagrams)
+6. [Deploy to SharePoint (step by step)](#deploy-to-sharepoint-step-by-step)
+7. [Embed in a modern SharePoint page (optional)](#embed-in-a-modern-sharepoint-page-optional)
+8. [More docs](#more-docs)
+9. [Notes](#notes)
 
 ---
 
@@ -104,18 +110,364 @@ persist to `localStorage` in demo mode. Preview each role by appending
 `?role=viewer|contributor|curator` to the URL. Use `index.html` locally —
 `index.aspx` only renders on SharePoint.
 
-## Deploy to SharePoint
+## Architecture & flow diagrams
 
-See **[docs/SHAREPOINT-DEPLOYMENT.md](docs/SHAREPOINT-DEPLOYMENT.md)** for the
-full step-by-step guide. In short:
+All diagrams are [Mermaid](https://mermaid.js.org/) and render natively on
+GitHub. The standalone copy lives in
+[docs/FLOW-DIAGRAM.md](docs/FLOW-DIAGRAM.md).
 
-1. Create a Communication site and **allow custom script** on it.
-2. Provision the six lists with the PowerShell Site Designs script in
-   [`lists/`](lists/).
-3. Upload the [`app/`](app/) files (minus `data/`, `index.html`, `serve.ps1`) to
-   `SiteAssets/sled/`.
-4. Open `…/SiteAssets/sled/index.aspx` and (optionally) surface it in navigation
-   or [embed it in a modern page](docs/EMBED-IN-MODERN-PAGES.md).
+### 1. Component architecture
+
+```mermaid
+flowchart TD
+    subgraph M365[Microsoft 365 Tenant]
+        subgraph Site[SharePoint Site · SLED Use Case Library / SLED Edge]
+            app["Single-page app<br/>SiteAssets/sled/index.aspx"]
+            page["(Optional) Modern Site Page<br/>with Embed web part"]
+            subgraph Lists[Six SharePoint Lists + 1 Library]
+                l1[(SLEDIndustries)]
+                l2[(SLEDUseCases)]
+                l3[(SLEDEvents)]
+                l4[(SLEDPatterns)]
+                l5[(SLEDAccelerators)]
+                l6[(SLEDAuditLog)]
+                lib[["SLEDSolutionArchitecture<br/>document library"]]
+            end
+        end
+        flow["Power Automate<br/>(optional approval flow)"]
+        search[(SharePoint Search)]
+    end
+
+    viewer([Viewer]) -->|browse / filter| app
+    contributor([Contributor]) -->|register / edit own| app
+    curator([Curator]) -->|manage all| app
+
+    page -->|iframe embed| app
+    app <-->|same-origin REST| l1 & l2 & l3 & l4 & l5 & l6
+    app <-->|upload / download artifacts| lib
+
+    l2 -->|Status = In Review| flow
+    flow -->|approve → Published| l2
+    flow -->|notify| curator
+    l2 --> search
+```
+
+### 2. Runtime data flow (DEV/PROD host detection)
+
+The identical code runs in both environments. `app/js/spconfig.js` inspects the
+host and chooses the data source — no code change between DEV and PROD.
+
+```mermaid
+flowchart TD
+    start([App loads: index.aspx / index.html]) --> detect{"Host is<br/>*.sharepoint.com ?"}
+    detect -->|Yes| live["Live mode:<br/>read/write six lists<br/>via same-origin REST"]
+    detect -->|No| demo["Demo mode:<br/>read seed JSON in app/data/<br/>persist edits to localStorage"]
+    live --> render[Render pages]
+    demo --> render
+    render --> role{"Resolve role<br/>(auth.js)"}
+    role -->|Site admin / *Curator*| curator[Curator UX: manage all]
+    role -->|*Member* / *Contributor*| contrib[Contributor UX: own records]
+    role -->|else / Read| viewer[Viewer UX: read-only]
+```
+
+### 3. Contribution & approval lifecycle
+
+```mermaid
+sequenceDiagram
+    actor C as Contributor
+    participant App as App (Register form)
+    participant L as SLEDUseCases list
+    participant F as Power Automate
+    actor R as Curator / Approver
+
+    C->>App: Fill "Register a Use Case"
+    App->>L: Create item (Status = In Review)
+    L-->>F: Trigger (item created/modified, Status = In Review)
+    F->>R: Start & wait for approval (Teams/email)
+    alt Approved
+        R-->>F: Approve
+        F->>L: Update Status = Published
+        Note over L: Visible in the main library
+    else Rejected
+        R-->>F: Reject with comments
+        F->>L: Update Status = Draft
+        F->>C: Notify with reviewer comments
+    end
+```
+
+### 4. Deployment flow (DEV → PROD)
+
+```mermaid
+flowchart LR
+    subgraph DEV[DEV site]
+        d1[Create Communication site] --> d2[Allow custom script]
+        d2 --> d3[Provision six lists<br/>Site Designs PowerShell]
+        d3 --> d4[Upload app/ to SiteAssets/sled]
+        d4 --> d5[Open index.aspx<br/>+ optional nav / embed]
+        d5 --> d6[Validate round-trip saves]
+    end
+    d6 ==>|sign-off| PROD
+    subgraph PROD[SLED Edge site]
+        p1[Re-run provisioning script] --> p2[Re-upload app/ files]
+        p2 --> p3[Add link under SLED Edge nav]
+        p3 --> p4[Apply hub theme]
+    end
+```
+
+> Internal column names are kept **identical** across DEV and PROD, so the app,
+> view formatting and the approval flow port with only the site/list URL
+> changing.
+
+---
+
+## Deploy to SharePoint (step by step)
+
+The only scripted step is list provisioning (via SharePoint **Site Designs** in
+the SharePoint Online Management Shell — **no PnP, no app registration, no admin
+consent, no F12 browser console**). Everything else is done in the browser. The
+standalone copy with extra detail lives in
+[docs/SHAREPOINT-DEPLOYMENT.md](docs/SHAREPOINT-DEPLOYMENT.md).
+
+> Replace `https://<tenant>.sharepoint.com` and the site name throughout with
+> your own. This guide uses a site named `SLEDUseCaseLibrary` as the example.
+
+### Prerequisites
+
+| Requirement | Notes |
+|---|---|
+| **SharePoint / tenant admin** | Needed to create the site and allow custom script |
+| **PowerShell 7** (`pwsh`) | For the local preview server (optional) |
+| **SharePoint Online Management Shell** | For list provisioning — install once (below) |
+| The `SLEDEdge` repo cloned locally | You'll upload files from [`app/`](app/) |
+
+```powershell
+# Install the management shell once (no PnP):
+Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser -Force
+```
+
+### Step 1 — Create the site
+
+**SharePoint admin center → `https://<tenant>-admin.sharepoint.com`**
+
+1. **Sites → Active sites → + Create**.
+2. Choose **Communication site** (cleaner navigation for a catalog).
+3. **Site name:** `SLEDUseCaseLibrary` → confirm the URL becomes
+   `https://<tenant>.sharepoint.com/sites/SLEDUseCaseLibrary`.
+4. Set **Language**, **Time zone**, and **Owner** (you). **Finish**.
+
+> **PROD (SLED Edge):** skip this — use the existing SLED Edge site.
+
+### Step 2 — Allow custom script (one-time)
+
+The app page (`index.aspx` with inline `<script>` references) requires custom
+script to be **allowed** on the site.
+
+**Admin center → Sites → Active sites → your site → Settings.**
+
+1. Find **Custom scripts** → set **Allow users to run custom script on this
+   site** to **Allow**. Save (can take a few minutes).
+
+> PowerShell equivalent: `Set-SPOSite -Identity <siteUrl> -DenyAddAndCustomizePages 0`.
+
+### Step 3 — Provision the six lists
+
+Creates the six `SLED*` lists (plain Text/Note columns — booleans stored as
+`Yes`/`No`, multi-values as `; `-joined text) plus the `SLEDSolutionArchitecture`
+library. Each column has an explicit Field XML internal name so REST round-trips
+never hit a "field does not exist" error.
+
+```powershell
+cd ./lists
+pwsh -File ./provision-sled-via-sitedesign.ps1 `
+     -SiteUrl "https://<tenant>.sharepoint.com/sites/SLEDUseCaseLibrary"
+```
+
+- You'll be prompted to sign in as a SharePoint/tenant admin; the admin URL is
+  auto-derived from the site URL.
+- Communication site is assumed (`-WebTemplate 68`); add `-WebTemplate 64` for a
+  Team site.
+- **Idempotent** — re-running only adds missing columns. Columns apply in chunks
+  of 12; large lists apply in 2–3 parts.
+- If your tenant blocks doc-library creation via Site Design, re-run with
+  `-SkipLibrary` and create `SLEDSolutionArchitecture` by hand.
+
+Expected tail: `Lists OK: 6 | failed: 0` → `Done.`
+
+**Verify:** **Site contents** shows the six `SLED*` lists + the
+`SLEDSolutionArchitecture` library. Column *internal* names are **unprefixed**
+(e.g. `IndustryId`, `BusinessProblem`) — the app addresses them by those exact
+names.
+
+> **Alternative (no admin shell):** paste
+> [`lists/provision-sled-list-browser.js`](lists/provision-sled-list-browser.js)
+> into the browser console while signed in. Same result, also idempotent. The
+> authoritative schema is
+> [`lists/sled-list-schema.json`](lists/sled-list-schema.json).
+
+### Step 4 — Set up permissions & roles
+
+Security is enforced by SharePoint (the app reads/writes as the signed-in user,
+so a disallowed write fails with 403). The app mirrors the user's role in the UI.
+
+| Role | SharePoint group (permission level) | Can do |
+|---|---|---|
+| **Viewer** | `SLED Visitors` (**Read**) | Browse everything; download artifacts |
+| **Contributor** | `SLED Members` (**Contribute**) | Create use cases; edit/archive their own |
+| **Curator** | `SLED Curators` (**Edit**) | Edit/archive any record; manage all entities |
+
+1. Site → **Settings ⚙ → Site permissions → Advanced permissions settings**.
+2. Create (or reuse) the three groups above with the listed permission levels.
+3. Add people to each group. Site Collection Admins are always Curator. Lists and
+   the library inherit site permissions — no per-list changes required.
+
+### Step 5 — Deploy the app files
+
+**Site contents → Site Assets.**
+
+1. Create a folder named **`sled`** inside **Site Assets**.
+2. Upload the contents of the local [`app/`](app/) folder, preserving structure:
+
+   ```
+   SiteAssets/sled/
+     index.aspx
+     css/styles.css
+     js/constants.js  js/spconfig.js  js/factory.js  js/store.js
+     js/data.js       js/docs.js      js/auth.js      js/app.js
+   ```
+3. **Do not** upload `app/data/`, `index.html`, or `serve.ps1` — those are for
+   local preview only. On SharePoint the app auto-switches to **live list** mode.
+
+Open the app:
+`https://<tenant>.sharepoint.com/sites/SLEDUseCaseLibrary/SiteAssets/sled/index.aspx`
+
+- If pages are empty or a save fails, re-check the list names (Step 3); if
+  scripts don't run, re-check custom script (Step 2).
+
+### Step 6 — Surface the app in navigation
+
+- **Option A — link directly:** Site → **Edit** navigation → **+ Add link** →
+  Address `…/SiteAssets/sled/index.aspx`, Display name `Use Case Library`.
+- **Option B — embed in a modern page:** see
+  [the next section](#embed-in-a-modern-sharepoint-page-optional).
+
+### Step 7 — Seed & validate
+
+1. **Register:** **+ Register → Register a Use Case** → pick an Industry, fill
+   the form → **Create use case**; confirm it round-trips to `SLEDUseCases`.
+2. **Browse/filter:** try the Industry / Segment / Status filters and search.
+3. **Detail tabs:** Overview / Solution & Tech / Value & Impact / Owner &
+   Artifacts.
+4. **Industries / Events / Patterns:** confirm each lists its records.
+5. **Audit:** archive a record, confirm it appears under **Audit**, then restore.
+
+### Step 8 — (Optional) Approval flow in Power Automate
+
+Item with **Status = In Review** → curator approval → **Published** (approve) or
+**Draft** (reject) → notify.
+
+**List → Integrate → Power Automate → Create a flow → Start from blank.**
+
+1. **Trigger:** *When an item is created or modified* → your site, List =
+   `SLEDUseCases`.
+2. **Trigger condition** (prevents loops):
+   `@equals(triggerOutputs()?['body/UCStatus'], 'In Review')`
+3. **Start and wait for an approval** — *Approve/Reject – First to respond*;
+   assign to your curator group; include Title, `IndustryId`, `BusinessProblem`,
+   `OwnerName`, and the item link.
+4. **Condition on Outcome:** Approved → `UCStatus` = **Published**; Rejected →
+   `UCStatus` = **Draft** + email the owner with comments.
+
+### Step 9 — DEV → PROD (SLED Edge)
+
+Keep internal names **identical** so everything ports:
+
+| Artifact | Method |
+|---|---|
+| Six lists + columns | Re-run the provisioning script against the SLED Edge site |
+| App files | Re-upload [`app/`](app/) to `SiteAssets/sled` (no code changes) |
+| Approval flow | Recreate/repoint to the PROD `SLEDUseCases` list (connection change only) |
+| Content | Re-register curated items in the app, or copy items between lists |
+| Navigation + theme | Add link under SLED Edge nav; apply the hub theme |
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `index.aspx` downloads instead of rendering | Use `index.aspx` (not `.html`) and allow custom script (Step 2) |
+| Pages load but are empty | List names/columns wrong — re-verify Step 3 (internal names unprefixed) |
+| Saves fail with 403 | Signed-in user lacks Contribute/Edit — check group membership (Step 4) |
+| App shows demo data on SharePoint | You uploaded the `data/` folder or opened it off a non-`sharepoint.com` host |
+| Scripts don't run at all | Custom script not yet applied — wait a few minutes after Step 2, then hard-reload |
+
+---
+
+## Embed in a modern SharePoint page (optional)
+
+The app runs perfectly standalone at `…/SiteAssets/sled/index.aspx`, but you can
+also surface it **inside a modern SharePoint Site Page** so it inherits the
+site's suite bar, search and theme — useful when integrating into **SLED Edge**.
+Both doorways use the **same lists and data**; only the chrome differs. The
+standalone copy lives in [docs/EMBED-IN-MODERN-PAGES.md](docs/EMBED-IN-MODERN-PAGES.md).
+
+| Doorway | URL shape | Chrome |
+|---|---|---|
+| **Standalone** | `…/SiteAssets/sled/index.aspx` | Full-width, no site chrome |
+| **Embedded** | `…/SitePages/Use-Case-Library.aspx` | Suite bar + search + site theme |
+
+### Method — Embed web part (iframe)
+
+Because the app lives on the **same site**, the modern **Embed** web part can
+iframe it without any allow-listing.
+
+1. On the site: **+ New → Page → Blank**. Name it e.g. `SLED Use Case Library`.
+2. Add a **full-width** section, then the **Embed** web part.
+3. Paste the app URL, or the full `<iframe>` form:
+   ```html
+   <iframe src="https://<tenant>.sharepoint.com/sites/SLEDUseCaseLibrary/SiteAssets/sled/index.aspx"
+           width="100%" height="1600" style="border:0;"></iframe>
+   ```
+4. **Publish** the page and add it to navigation.
+
+> **Same-site only.** If you ever host the app on a *different* site collection,
+> add that origin under **SharePoint admin center → Advanced → HTML field
+> security** for the target site.
+
+### Recommended page settings
+
+| Setting | Where | Why |
+|---|---|---|
+| **Header layout: Minimal** | Page → Edit → header settings | Reclaims vertical space |
+| **Section: Full-width** | Add-section chooser | App fills the width |
+| **Site navigation: off** *(optional)* | Change the look → Navigation | Avoids double navigation |
+| **Fixed iframe height (~1400–1800px)** | Embed web part | SPA — a generous height avoids inner scrollbars |
+
+### Tips & gotchas
+
+- **Use `index.aspx`, not `index.html`** — a raw `.html` in a library tends to
+  *download* rather than render.
+- **Iframe height is fixed** — modern Embed doesn't auto-resize; prefer the
+  standalone doorway for the richest pages (long Use Case detail views).
+- **Theme** — the embedded page inherits the site/hub theme automatically; the
+  app keeps its own design system inside the iframe.
+
+**Which doorway?** Standalone for day-to-day use and the richest pages; embedded
+for integration into SLED Edge with the suite bar / search / theme around it. You
+can ship **both** — they read and write the same six lists.
+
+---
+
+## More docs
+
+The following hold the same material as above (standalone) plus deeper design and
+runbook detail:
+
+| Doc | What it covers |
+|---|---|
+| [docs/FLOW-DIAGRAM.md](docs/FLOW-DIAGRAM.md) | Architecture & data-flow diagrams (Mermaid) |
+| [docs/SHAREPOINT-DEPLOYMENT.md](docs/SHAREPOINT-DEPLOYMENT.md) | Step-by-step SharePoint Online deployment |
+| [docs/EMBED-IN-MODERN-PAGES.md](docs/EMBED-IN-MODERN-PAGES.md) | *(Optional)* Embedding the app in a modern page |
+| [PHASE-1-PLAN-AND-ARCHITECTURE.md](PHASE-1-PLAN-AND-ARCHITECTURE.md) | Full architecture, data model & governance plan |
+| [PHASE-2-PROTOTYPE-RUNBOOK.md](PHASE-2-PROTOTYPE-RUNBOOK.md) | Detailed GUI-first prototype stand-up runbook |
 
 ---
 
