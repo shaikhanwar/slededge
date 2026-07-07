@@ -1,0 +1,169 @@
+{
+  "$schema": "internal://sled/list-schema",
+  "description": "SharePoint Online / Microsoft Lists definitions for the SLED Use Case Library prototype (DEV). The app is a multi-entity catalogue, so it is backed by SIX lists — one per entity — instead of the original single list. Every column is Text or Note only: the app stores booleans as the text 'Yes'/'No' and multi-value fields as '; '-joined text, so a single string-based mapping round-trips with no type friction (see SLEDEdge/app/js/store.js -> MAPS, the source of truth this file mirrors 1:1). Column INTERNAL names are NOT prefixed (e.g. IndustryId, BusinessProblem) because the app reads/writes them by those exact names; only the LIST titles are SLED-prefixed. The default Title column is reused as each list's natural name field. Internal names are identical between DEV and PROD so views/forms and any future Power Automate flow port cleanly.",
+  "target": {
+    "tenant": "vw4gr.onmicrosoft.com",
+    "root": "https://vw4gr.sharepoint.com",
+    "devSiteUrl": "https://vw4gr.sharepoint.com/sites/SLEDUseCaseLibrary",
+    "appUrl": "<devSiteUrl>/SiteAssets/sled/index.aspx"
+  },
+  "conventions": {
+    "listTitlePrefix": "SLED",
+    "columnInternalNames": "Unprefixed; must match SLEDEdge/app/js/store.js MAPS column[0] exactly.",
+    "titleColumn": "The built-in Title column is reused as the list's name field (Industry/Use Case/Event/Pattern/Accelerator/Audit record name).",
+    "booleans": "Stored as Text 'Yes'/'No'.",
+    "multiValue": "Stored as Text/Note '; '-joined (Tags, Components, Services, Themes, Organizers, AcceleratorIds).",
+    "versioning": "Enabled on every list (major version limit 50) to provide restore history alongside the in-app Audit log."
+  },
+  "lists": [
+    {
+      "title": "SLEDIndustries",
+      "appKey": "industries",
+      "businessKey": "IndustryId",
+      "titleRenamedTo": "Industry Name",
+      "indexedColumns": ["IndustryId"],
+      "columns": [
+        { "displayName": "Industry Name", "internalName": "Title", "type": "Text", "required": true, "isTitle": true },
+        { "displayName": "Industry Id", "internalName": "IndustryId", "type": "Text" },
+        { "displayName": "Segment", "internalName": "Segment", "type": "Text" },
+        { "displayName": "Description", "internalName": "Description", "type": "Note" },
+        { "displayName": "Record Status", "internalName": "RecordStatus", "type": "Text" },
+        { "displayName": "Created By Name", "internalName": "CreatedByName", "type": "Text" },
+        { "displayName": "Created At Text", "internalName": "CreatedAtText", "type": "Text" },
+        { "displayName": "Modified By Name", "internalName": "ModifiedByName", "type": "Text" },
+        { "displayName": "Modified At Text", "internalName": "ModifiedAtText", "type": "Text" }
+      ]
+    },
+    {
+      "title": "SLEDUseCases",
+      "appKey": "useCases",
+      "businessKey": "UseCaseId",
+      "titleRenamedTo": "Use Case Name",
+      "indexedColumns": ["UseCaseId", "IndustryId", "UCStatus"],
+      "columns": [
+        { "displayName": "Use Case Name", "internalName": "Title", "type": "Text", "required": true, "isTitle": true },
+        { "displayName": "Use Case Id", "internalName": "UseCaseId", "type": "Text" },
+        { "displayName": "Industry Id", "internalName": "IndustryId", "type": "Text" },
+        { "displayName": "Segment", "internalName": "Segment", "type": "Text" },
+        { "displayName": "Status", "internalName": "UCStatus", "type": "Text" },
+        { "displayName": "Business Problem", "internalName": "BusinessProblem", "type": "Note" },
+        { "displayName": "Current Process", "internalName": "CurrentProcess", "type": "Note" },
+        { "displayName": "Challenge Summary", "internalName": "ChallengeSummary", "type": "Note" },
+        { "displayName": "Proposed Solution", "internalName": "ProposedSolution", "type": "Note" },
+        { "displayName": "Beneficiaries", "internalName": "Beneficiaries", "type": "Note" },
+        { "displayName": "Tags", "internalName": "Tags", "type": "Note", "note": "Multi-value '; '-joined." },
+        { "displayName": "Components", "internalName": "Components", "type": "Note", "note": "Multi-value '; '-joined." },
+        { "displayName": "Copilot Role", "internalName": "CopilotRole", "type": "Text" },
+        { "displayName": "Services", "internalName": "Services", "type": "Note", "note": "Multi-value '; '-joined." },
+        { "displayName": "Solution Play", "internalName": "SolutionPlay", "type": "Text" },
+        { "displayName": "Pattern Id", "internalName": "PatternId", "type": "Text" },
+        { "displayName": "Data Dependencies", "internalName": "DataDependencies", "type": "Note" },
+        { "displayName": "Compliance", "internalName": "Compliance", "type": "Note" },
+        { "displayName": "Risks", "internalName": "Risks", "type": "Note" },
+        { "displayName": "Business Value", "internalName": "BusinessValue", "type": "Note" },
+        { "displayName": "Estimated Impact", "internalName": "EstimatedImpact", "type": "Text" },
+        { "displayName": "Impact Metric", "internalName": "ImpactMetric", "type": "Text" },
+        { "displayName": "Feasibility", "internalName": "Feasibility", "type": "Note" },
+        { "displayName": "Reusability", "internalName": "Reusability", "type": "Note" },
+        { "displayName": "Owner Name", "internalName": "OwnerName", "type": "Text" },
+        { "displayName": "Owner Email", "internalName": "OwnerEmail", "type": "Text" },
+        { "displayName": "Reference URL", "internalName": "ReferenceUrl", "type": "Text" },
+        { "displayName": "Repo URL", "internalName": "RepoUrl", "type": "Text" },
+        { "displayName": "Record Status", "internalName": "RecordStatus", "type": "Text" },
+        { "displayName": "Created By Name", "internalName": "CreatedByName", "type": "Text" },
+        { "displayName": "Created At Text", "internalName": "CreatedAtText", "type": "Text" },
+        { "displayName": "Modified By Name", "internalName": "ModifiedByName", "type": "Text" },
+        { "displayName": "Modified At Text", "internalName": "ModifiedAtText", "type": "Text" }
+      ]
+    },
+    {
+      "title": "SLEDEvents",
+      "appKey": "events",
+      "businessKey": "EventId",
+      "titleRenamedTo": "Event Title",
+      "indexedColumns": ["EventId"],
+      "columns": [
+        { "displayName": "Event Title", "internalName": "Title", "type": "Text", "required": true, "isTitle": true },
+        { "displayName": "Event Id", "internalName": "EventId", "type": "Text" },
+        { "displayName": "Start Date", "internalName": "StartDate", "type": "Text", "note": "ISO date stored as text." },
+        { "displayName": "End Date", "internalName": "EndDate", "type": "Text", "note": "ISO date stored as text." },
+        { "displayName": "Status", "internalName": "EventStatus", "type": "Text" },
+        { "displayName": "Format", "internalName": "Format", "type": "Text" },
+        { "displayName": "Location", "internalName": "Location", "type": "Text" },
+        { "displayName": "Themes", "internalName": "Themes", "type": "Note", "note": "Multi-value '; '-joined." },
+        { "displayName": "Organizers", "internalName": "Organizers", "type": "Note", "note": "Multi-value '; '-joined." },
+        { "displayName": "Registration URL", "internalName": "RegistrationUrl", "type": "Text" },
+        { "displayName": "Notes", "internalName": "Notes", "type": "Note" },
+        { "displayName": "Record Status", "internalName": "RecordStatus", "type": "Text" },
+        { "displayName": "Created By Name", "internalName": "CreatedByName", "type": "Text" },
+        { "displayName": "Created At Text", "internalName": "CreatedAtText", "type": "Text" },
+        { "displayName": "Modified By Name", "internalName": "ModifiedByName", "type": "Text" },
+        { "displayName": "Modified At Text", "internalName": "ModifiedAtText", "type": "Text" }
+      ]
+    },
+    {
+      "title": "SLEDPatterns",
+      "appKey": "patterns",
+      "businessKey": "PatternId",
+      "titleRenamedTo": "Pattern Name",
+      "indexedColumns": ["PatternId"],
+      "columns": [
+        { "displayName": "Pattern Name", "internalName": "Title", "type": "Text", "required": true, "isTitle": true },
+        { "displayName": "Pattern Id", "internalName": "PatternId", "type": "Text" },
+        { "displayName": "Summary", "internalName": "Summary", "type": "Note" },
+        { "displayName": "Repeatability", "internalName": "Repeatability", "type": "Text" },
+        { "displayName": "Solution Play", "internalName": "SolutionPlay", "type": "Text" },
+        { "displayName": "Components", "internalName": "Components", "type": "Note", "note": "Multi-value '; '-joined." },
+        { "displayName": "Accelerator Ids", "internalName": "AcceleratorIds", "type": "Note", "note": "Multi-value '; '-joined." },
+        { "displayName": "Record Status", "internalName": "RecordStatus", "type": "Text" },
+        { "displayName": "Created By Name", "internalName": "CreatedByName", "type": "Text" },
+        { "displayName": "Created At Text", "internalName": "CreatedAtText", "type": "Text" },
+        { "displayName": "Modified By Name", "internalName": "ModifiedByName", "type": "Text" },
+        { "displayName": "Modified At Text", "internalName": "ModifiedAtText", "type": "Text" }
+      ]
+    },
+    {
+      "title": "SLEDAccelerators",
+      "appKey": "accelerators",
+      "businessKey": "AcceleratorId",
+      "titleRenamedTo": "Accelerator Name",
+      "indexedColumns": ["AcceleratorId"],
+      "columns": [
+        { "displayName": "Accelerator Name", "internalName": "Title", "type": "Text", "required": true, "isTitle": true },
+        { "displayName": "Accelerator Id", "internalName": "AcceleratorId", "type": "Text" },
+        { "displayName": "Type", "internalName": "AccType", "type": "Text" },
+        { "displayName": "Pattern Id", "internalName": "PatternId", "type": "Text" },
+        { "displayName": "URL", "internalName": "Url", "type": "Text" }
+      ]
+    },
+    {
+      "title": "SLEDAuditLog",
+      "appKey": "audit",
+      "businessKey": "AuditId",
+      "titleRenamedTo": "Record Title",
+      "indexedColumns": ["AuditId"],
+      "columns": [
+        { "displayName": "Record Title", "internalName": "Title", "type": "Text", "required": true, "isTitle": true },
+        { "displayName": "Audit Id", "internalName": "AuditId", "type": "Text" },
+        { "displayName": "Record Id", "internalName": "RecordId", "type": "Text" },
+        { "displayName": "Record Type", "internalName": "RecordType", "type": "Text" },
+        { "displayName": "Action", "internalName": "Action", "type": "Text" },
+        { "displayName": "Summary", "internalName": "Summary", "type": "Note" },
+        { "displayName": "By Name", "internalName": "ByName", "type": "Text" },
+        { "displayName": "At Text", "internalName": "AtText", "type": "Text" }
+      ]
+    }
+  ],
+  "documentLibrary": {
+    "title": "SLEDSolutionArchitecture",
+    "appKey": "docs",
+    "baseTemplate": 101,
+    "versioning": true,
+    "association": "One folder per use case, named by UseCaseId (e.g. 'UC-001'). Uploaded architecture artifacts (diagrams, decks, specs) live in that folder. No extra columns — the folder name is the only link back to the use case.",
+    "allowedExtensions": ["pptx", "ppt", "pdf", "docx", "xlsx", "vsdx", "vsd", "png", "jpg", "jpeg", "gif", "svg"],
+    "maxBytes": 26214400,
+    "appModule": "SLEDEdge/app/js/docs.js — SharePoint REST (Files/Folders API) when hosted on SharePoint; IndexedDB fallback for the local demo.",
+    "replaces": "The former 'ReferenceUrl' text field on use cases (the column may remain on SLEDUseCases for back-compat but is no longer surfaced in the UI)."
+  },
+  "appNote": "The app discovers list titles via SLEDEdge/app/js/spconfig.js (listPrefix 'SLED' + LISTS suffix). It reads all six lists over same-origin REST on load, and on save reconciles each list against the in-memory db (create / MERGE / DELETE) keyed on each list's businessKey column. No Choice/Person/Number/Lookup columns are used, keeping provisioning and round-tripping trivial. Solution Architecture artifacts are stored separately in the SLEDSolutionArchitecture library (see documentLibrary above), in one folder per record keyed by UseCaseId / PatternId."
+}

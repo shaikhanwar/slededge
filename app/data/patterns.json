@@ -1,0 +1,10 @@
+{
+  "patterns": [
+    { "id": "PAT-001", "name": "Document-grounded Copilot (RAG)", "summary": "Retrieval-augmented assistant over an agency's document corpus with citations and access trimming.", "repeatability": "High", "solutionPlay": "Data & AI for Public Sector", "components": ["Azure OpenAI", "Azure AI Search", "Entra ID"], "acceleratorIds": ["ACC-001"], "createdBy": "Seed", "createdAt": "2026-05-02T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-02T12:00:00.000Z" },
+    { "id": "PAT-002", "name": "Real-time event summarization", "summary": "Stream transcription and summarization of live audio/text with structured output for downstream systems.", "repeatability": "Medium", "solutionPlay": "Public Safety & Justice Modernization", "components": ["Azure AI Speech", "Azure OpenAI", "Event Hubs"], "acceleratorIds": ["ACC-002"], "createdBy": "Seed", "createdAt": "2026-05-02T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-02T12:00:00.000Z" }
+  ],
+  "accelerators": [
+    { "id": "ACC-001", "name": "RAG starter (Bicep + app)", "type": "Repo template", "patternId": "PAT-001", "url": "https://contoso.example/accelerators/rag-starter" },
+    { "id": "ACC-002", "name": "Streaming summarizer sample", "type": "Sample app", "patternId": "PAT-002", "url": "https://contoso.example/accelerators/stream-summarizer" }
+  ]
+}

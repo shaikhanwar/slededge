@@ -1,0 +1,9 @@
+{
+  "industries": [
+    { "id": "IND-001", "name": "State & Local Government", "segment": "State Agency", "description": "Statewide agencies and local governments modernizing citizen services, operations, and back-office systems.", "createdBy": "Seed", "createdAt": "2026-05-01T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-01T12:00:00.000Z" },
+    { "id": "IND-002", "name": "Public Safety & Justice", "segment": "State Agency", "description": "Law enforcement, courts, corrections, and emergency response improving outcomes with AI and cloud.", "createdBy": "Seed", "createdAt": "2026-05-01T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-01T12:00:00.000Z" },
+    { "id": "IND-003", "name": "Public Health & Social Services", "segment": "County Government", "description": "Health departments and human-services agencies streamlining benefits, casework, and population health.", "createdBy": "Seed", "createdAt": "2026-05-01T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-01T12:00:00.000Z" },
+    { "id": "IND-004", "name": "Transportation & Urban Infrastructure", "segment": "Special District / Regional Authority", "description": "Transit, roads, utilities, and smart-city infrastructure using data and AI for resilience and efficiency.", "createdBy": "Seed", "createdAt": "2026-05-01T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-01T12:00:00.000Z" },
+    { "id": "IND-005", "name": "Education", "segment": "Higher Education Institution", "description": "K-12 districts and higher-ed institutions improving student success, operations, and research.", "createdBy": "Seed", "createdAt": "2026-05-01T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-01T12:00:00.000Z" }
+  ]
+}
