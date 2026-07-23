@@ -1,7 +1,7 @@
 # SLEDEdge Checkpoint — SLED Use Case Library
 
 **Purpose:** Crash-recovery handoff so this work can resume on any machine (incl. a fresh VM) with full context.
-**Last updated:** 2026-07-08
+**Last updated:** 2026-07-23
 **Active track:** `SLEDEdge/` (this folder). The Hackathon Content Library in `hackathon-content-library/` is the **reference** solution this is modelled on; it is a separate, completed solution.
 
 ---
@@ -23,6 +23,19 @@ Delivered entirely on **Microsoft 365 no-code/low-code**: six SharePoint **Lists
 ---
 
 ## 2. Where things stand
+
+> **Latest (2026-07-23):** Model has grown well past the original six lists — now
+> **eight** `SLED*` lists (adds `SLEDVerticals`, `SLEDSolutionPlays`) plus the
+> `SLEDSolutionArchitecture` doc library. Shipped the **Industry → Vertical**
+> taxonomy, **data-driven Solution Plays**, the **contributor approval workflow**
+> (Approvals tab, Pending/Approve/Reject), the refined **role model**, and
+> **filter bars with search on every browse page** (Use Cases, Industries,
+> Solution Plays, Patterns, Events — Events adds a date range). All work is
+> committed and pushed to GitHub `shaikhanwar/slededge` (`main`). Authoritative,
+> current architecture + history live in repo memory
+> (`/memories/repo/slededge-architecture.md`, `…-history.md`). The list/model
+> details further down this file predate these changes — treat the memory files
+> as the source of truth.
 
 | Phase | Status |
 |---|---|

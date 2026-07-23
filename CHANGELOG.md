@@ -3,6 +3,24 @@
 All notable changes to the SLED Use Case Library (classic app) are documented
 here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-07-23 — Browse & search filters
+
+### Added
+- **Filter bars on every browse page.** Industries, Solution Plays, Patterns and
+  Events now have the same filter bar as Use Cases (a **Clear filters** button
+  and a live **COUNT**), each including a **Search text** field:
+  - **Industries** — search (matches name, description and vertical names).
+  - **Solution Plays** — search (matches name and description).
+  - **Patterns** — **Repeatability** + **Solution Play** dropdowns + search
+    (name, summary, components).
+  - **Events** — **Status** + **Format** dropdowns + **From date** / **To date**
+    range pickers + search (title, location, themes, organizers, notes).
+- Reuses the existing `.filterbar` styles and shared helpers (`opts`, `csv`,
+  `solutionPlayNames`); no new SharePoint columns or list changes.
+
+### Changed
+- Cache-bust bumped: `index.aspx` loads `js/app.js?v=11`.
+
 ## 2026-07-23
 
 ### Added
