@@ -86,6 +86,7 @@ contributor submissions can be held for owner/approver review.
 ```
 SLEDEdge/
   README.md                          this file
+  CHANGELOG.md                       notable changes over time
   PHASE-1-PLAN-AND-ARCHITECTURE.md   design baseline
   PHASE-2-PROTOTYPE-RUNBOOK.md       detailed GUI stand-up steps
   CHECKPOINT.md                      crash-recovery handoff / status

@@ -1,0 +1,60 @@
+# Changelog
+
+All notable changes to the SLED Use Case Library (classic app) are documented
+here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
+
+## 2026-07-23
+
+### Added
+- **Industry → Vertical taxonomy.** Verticals are a first-class, registrable
+  entity (`SLEDVerticals`); each belongs to a parent industry. Use cases link to
+  an Industry **and** a Vertical via a dependent dropdown. Industry detail pages
+  list their verticals.
+- **Solution Plays as data.** Microsoft solution plays are now a registrable,
+  editable list (`SLEDSolutionPlays`) instead of a hardcoded choice set, with a
+  dedicated **Solution Plays** browse page. Use cases and patterns pick from the
+  approved records.
+- **Approval workflow.** Content submitted by contributors is held **Pending**
+  and hidden from the catalog until reviewed. A new **Approvals** tab (visible to
+  Owners/Approvers only, with a pending-count badge) provides **Approve** and
+  **Reject** (with a reason) actions. Approval columns
+  (`ApprovalStatus`, `SubmittedByName`, `SubmittedAtText`, `ReviewedByName`,
+  `ReviewedAtText`, `ReviewNote`) were added to Industries, Verticals, Solution
+  Plays, Use Cases, Patterns and Accelerators.
+- **New registration flows** for Verticals and Solution Plays, plus a reordered
+  Register hub: Use Case → Solution Play → Pattern/Accelerator → Industry →
+  Vertical → Event.
+- **Data seeder & reset** browser scripts: `lists/seed-sled-data-browser.js`
+  (seeds Industries, Verticals, Solution Plays, Use Cases, Patterns,
+  Accelerators — idempotent) and `lists/clear-sled-data-browser.js` (clears all
+  `SLED*` lists into the Recycle Bin).
+
+### Changed
+- **Segment → Vertical** throughout the UI, data model, seed data, schema and
+  provisioning.
+- **Role model.** Contributors can create Use Cases, Patterns, Accelerators and
+  Solution Plays (all queued for approval); Curators/Owners do everything and
+  manage Industries, Verticals and Events. SharePoint role resolution now treats
+  **group membership as authoritative** (permission probing is a fallback only).
+- **Navigation** reordered to: Home, Use Cases, Industries, Solution Plays,
+  Patterns, Events, Approvals, Audit, About.
+- Provisioning now creates **eight** `SLED*` lists; the Site Designs script runs
+  in **Windows PowerShell 5.1 or PowerShell 7**. README and `docs/` updated to
+  match (lists, roles, approval lifecycle, deployment steps).
+
+### Fixed
+- SharePoint role detection no longer mis-promotes members of the default
+  **Members** group (which has *Edit* / Manage-Lists rights) to Curator, so the
+  approval workflow engages correctly.
+- The **+ Add a vertical** button rendered white-on-white on the page header
+  (now legible); button order corrected (Register an industry first).
+- Mermaid **Contribution & approval lifecycle** diagram failed to render on
+  GitHub (a `;` in a sequence-diagram note was parsed as a statement separator);
+  replaced with a comma.
+
+## Baseline
+
+Prior to the above, the app was a zero-build, vanilla-ES-module single-page app
+over six SharePoint lists (Industries, UseCases, Events, Patterns, Accelerators,
+AuditLog) with a role-aware UI and an optional Power Automate approval flow. See
+the README and `docs/` for architecture, diagrams and deployment.
