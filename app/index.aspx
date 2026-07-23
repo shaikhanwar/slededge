@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SLED Use Case Library</title>
-  <link rel="stylesheet" href="css/styles.css?v=6" />
+  <link rel="stylesheet" href="css/styles.css?v=7" />
 </head>
 <body>
   <header class="topbar">
@@ -48,6 +48,6 @@
     <span>SLED Use Case Library &mdash; internal Microsoft catalog of reusable SLED use cases. Prototype &middot; <a href="#/about" style="color:inherit;text-decoration:underline">About</a></span>
   </footer>
 
-  <script type="module" src="js/app.js?v=13"></script>
+  <script type="module" src="js/app.js?v=14"></script>
 </body>
 </html>
