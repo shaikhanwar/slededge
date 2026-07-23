@@ -3,6 +3,22 @@
 All notable changes to the SLED Use Case Library (classic app) are documented
 here. Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-07-23 — About page & contacts
+
+### Added
+- **Owners & contacts** on the About page, rendered as signature-style cards
+  (name · title · org · a bold **Email** label above the address as a `mailto:`
+  link): Orry Young, Jennifer Meidl, Anwar Shaikh.
+
+### Changed
+- **About page is now independent.** Removed the "Adapted from the Hackathon
+  Content Library" framing and rewrote the copy to describe the library's own
+  purpose — a single, searchable home for the SLED field to find, understand and
+  reuse proven use cases. Refreshed the data-model row to the current eight
+  entities (Industries · Verticals · Solution Plays · Use Cases · Patterns ·
+  Accelerators · Events · Audit log).
+- Cache-bust bumped to `styles.css?v=7`, `app.js?v=14`.
+
 ## 2026-07-23 — Browse & search filters
 
 ### Added

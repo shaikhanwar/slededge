@@ -30,9 +30,12 @@ Delivered entirely on **Microsoft 365 no-code/low-code**: six SharePoint **Lists
 > taxonomy, **data-driven Solution Plays**, the **contributor approval workflow**
 > (Approvals tab, Pending/Approve/Reject), the refined **role model**, and
 > **filter bars with search on every browse page** (Use Cases, Industries,
-> Solution Plays, Patterns, Events — Events adds a date range). All work is
-> committed and pushed to GitHub `shaikhanwar/slededge` (`main`). Authoritative,
-> current architecture + history live in repo memory
+> Solution Plays, Patterns, Events — Events adds a date range). The **About page**
+> was rewritten as an independent product overview (no longer "adapted from HCL")
+> with an **Owners & contacts** block (Orry Young, Jennifer Meidl, Anwar Shaikh).
+> Current cache-bust: `styles.css?v=7`, `app.js?v=14`. All work is committed and
+> pushed to GitHub `shaikhanwar/slededge` (`main`). Authoritative, current
+> architecture + history live in repo memory
 > (`/memories/repo/slededge-architecture.md`, `…-history.md`). The list/model
 > details further down this file predate these changes — treat the memory files
 > as the source of truth.
