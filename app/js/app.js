@@ -930,13 +930,28 @@ function pageAbout() {
   return el(`<div>
     <div class="page-head"><h1>About</h1><p>SLED Use Case Library</p></div>
     <div class="card" style="max-width:760px">
-      <p>An internal Microsoft catalog of reusable use cases across the five SLED verticals: State &amp; Local Government, Public Safety &amp; Justice, Public Health &amp; Social Services, Transportation &amp; Urban Infrastructure, and Education.</p>
-      <p>Adapted from the Hackathon Content Library: use cases map to an <strong>Industry</strong> (instead of an Agency), carry a lifecycle <strong>Status</strong> (Draft / In Review / Published), and name an <strong>Owner</strong>. Reusable <strong>Patterns</strong> and Solution accelerators and a full <strong>Audit</strong> trail are retained. Events are tracked standalone and are not linked to use cases.</p>
+      <p>The <strong>SLED Use Case Library</strong> is an internal Microsoft catalog for capturing, browsing and reusing proven use cases across the five SLED verticals: State &amp; Local Government, Public Safety &amp; Justice, Public Health &amp; Social Services, Transportation &amp; Urban Infrastructure, and Education.</p>
+      <p>It gives the SLED field a single, searchable home for what has already been built so teams can find a relevant solution, understand the business problem it solves, and reuse the underlying pattern instead of starting from scratch. Each use case maps to an <strong>Industry</strong> and <strong>Vertical</strong>, carries a lifecycle <strong>Status</strong> (Draft / In Review / Published), names an <strong>Owner</strong>, and links to reusable <strong>Patterns</strong>, <strong>Solution accelerators</strong> and <strong>Solution plays</strong>. Contributor submissions run through an <strong>approval workflow</strong> before they appear in the catalog, and every change is captured in a full <strong>Audit</strong> trail. <strong>Events</strong> are tracked standalone.</p>
       <table class="tbl"><tbody>
         <tr><th>Front end</th><td>Vanilla JS single-page app (hash router, no build step)</td></tr>
-        <tr><th>Data model</th><td>Industries · Use Cases · Events · Patterns · Accelerators · Audit log</td></tr>
+        <tr><th>Data model</th><td>Industries · Verticals · Solution Plays · Use Cases · Patterns · Accelerators · Events · Audit log</td></tr>
         <tr><th>Persistence</th><td>SharePoint Lists when hosted; local browser storage for demo</td></tr>
         <tr><th>Hosting</th><td>SharePoint Online (SiteAssets) — portable across sites</td></tr>
+      </tbody></table>
+      <h3 style="margin-top:22px">Owners &amp; contacts</h3>
+      <table class="tbl"><tbody>
+        <tr>
+          <td><strong>Orry Young</strong><br><span class="dim tiny">Sr GTM Mgr · AMS SE&amp;O_ATU SE_US1010</span></td>
+          <td><a href="mailto:youngorry@microsoft.com">youngorry@microsoft.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>Anwar Shaikh</strong><br><span class="dim tiny">Sr Cloud Solution Architect · US SLED CSU Cloud AI</span></td>
+          <td><a href="mailto:shaikhanwar@microsoft.com">shaikhanwar@microsoft.com</a></td>
+        </tr>
+        <tr>
+          <td><strong>Jennifer Meidl</strong><br><span class="dim tiny">Dir CSA · US SLED CSU Cloud AI</span></td>
+          <td><a href="mailto:Jennifer.Meidl@microsoft.com">Jennifer.Meidl@microsoft.com</a></td>
+        </tr>
       </tbody></table>
     </div></div>`);
 }
