@@ -12,3 +12,7 @@ node_modules/
 
 # Internal source decks (do not publish)
 *.pptx
+
+# Local-only: parallel modern-SharePoint (SPFx) migration track — not part of the
+# classic app; kept locally, never pushed.
+modern-track/
