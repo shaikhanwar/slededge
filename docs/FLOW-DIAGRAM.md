@@ -75,24 +75,26 @@ flowchart TD
 sequenceDiagram
     actor C as Contributor
     participant App as App (Register form)
-    participant L as SLEDUseCases list
-    participant F as Power Automate
-    actor R as Curator / Approver
+    participant L as SLED list (Use Case / Pattern / …)
+    participant Ap as Approvals tab
+    actor R as Curator / Owner
 
-    C->>App: Fill "Register a Use Case"
-    App->>L: Create item (Status = In Review)
-    L-->>F: Trigger (item created/modified, Status = In Review)
-    F->>R: Start & wait for approval (Teams/email)
-    alt Approved
-        R-->>F: Approve
-        F->>L: Update Status = Published
-        Note over L: Visible in the main library
-    else Rejected
-        R-->>F: Reject with comments
-        F->>L: Update Status = Draft
-        F->>C: Notify with reviewer comments
+    C->>App: Submit (Use Case, Pattern, Accelerator or Solution Play)
+    App->>L: Create/update item (ApprovalStatus = Pending)
+    Note over L: Hidden from the public catalog while Pending
+    R->>Ap: Open Approvals (Owners/Approvers only)
+    alt Approve
+        Ap->>L: ApprovalStatus = Approved
+        Note over L: Now visible in the catalog
+    else Reject
+        Ap->>L: ApprovalStatus = Rejected (+ reason)
+        Note over L: Stays hidden, kept for audit
     end
 ```
+
+> Curator/Owner submissions publish immediately. The in-app Approvals queue is
+> the primary workflow; the optional Power Automate flow can add Teams/email
+> notifications.
 
 ---
 

@@ -207,7 +207,7 @@ sequenceDiagram
         Note over L: Now visible in the catalog
     else Reject
         Ap->>L: ApprovalStatus = Rejected (+ reason)
-        Note over L: Stays hidden; kept for audit
+        Note over L: Stays hidden, kept for audit
     end
 ```
 
