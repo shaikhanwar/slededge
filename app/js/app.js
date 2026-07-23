@@ -575,33 +575,60 @@ function renderDocTiles(listEl, docs, { onRemove, refresh, readOnly = false }) {
 }
 
 // ---- Industries -----------------------------------------------------------
+const indFilter = { search: '' };
+function filteredIndustries() {
+  let list = db.industries.filter(i => i.recordStatus !== 'Archived' && isApproved(i));
+  if (indFilter.search) {
+    const q = indFilter.search.toLowerCase();
+    list = list.filter(i => [i.name, i.description, verticalsForIndustry(i.id).map(v => v.name).join(' ')]
+      .join(' ').toLowerCase().includes(q));
+  }
+  return list.sort((a, b) => a.name.localeCompare(b.name));
+}
 function pageIndustries() {
   const counts = industryCounts();
   const manage = canManageTaxonomy();
   const canVert = canCreate('vertical');
-  const list = db.industries.filter(i => i.recordStatus !== 'Archived' && isApproved(i)).sort((a, b) => a.name.localeCompare(b.name));
   const node = el(`<div>
     <div class="page-head spread"><div><h1>Industries</h1><p>SLED industries and their verticals</p></div>
       <div class="record-actions">
         ${manage ? '<a class="btn primary" href="#/register/industry">+ Register an industry</a>' : ''}
         ${canVert ? '<a class="btn" href="#/register/vertical">+ Add a vertical</a>' : ''}</div></div>
+    <div class="filterbar">
+      <div class="filter-fields">
+        <label class="filter-field"><span>Search text</span><input id="indSearch" placeholder="Search name, description, verticals…" value="${esc(indFilter.search)}"></label>
+      </div>
+      <div class="filter-foot"><button class="btn tiny ghost" id="indClear">Clear filters</button><span class="filter-count" id="indCount"></span></div>
+    </div>
     <div class="grid cols-3" id="indGrid"></div></div>`);
   const grid = node.querySelector('#indGrid');
-  if (!list.length) grid.appendChild(el('<span class="dim">No industries yet.</span>'));
-  list.forEach(i => {
-    const verts = verticalsForIndustry(i.id);
-    const c = el(`<div class="card hover">
-      <div class="spread"><h3>${esc(i.name)}</h3><span class="status-pill">${counts[i.id] || 0} use case${(counts[i.id] || 0) === 1 ? '' : 's'}</span></div>
-      <div class="uc-meta">${verts.length} vertical${verts.length === 1 ? '' : 's'}${verts.length ? ' · ' + esc(verts.slice(0, 3).map(v => v.name).join(', ')) + (verts.length > 3 ? '…' : '') : ''}</div>
-      <p class="tiny muted">${esc(i.description) || '<span class="dim">No description.</span>'}</p>
-      <div class="record-actions" style="margin-top:6px">
-        ${manage ? '<button class="btn tiny" data-edit>Edit</button>' : ''}
-        <button class="btn tiny ghost" data-open>Open</button>
-      </div></div>`);
-    if (manage) c.querySelector('[data-edit]').addEventListener('click', () => openEditIndustry(i.id));
-    c.querySelector('[data-open]').addEventListener('click', () => { location.hash = `#/industry/${i.id}`; });
-    grid.appendChild(c);
+  const count = node.querySelector('#indCount');
+  const render = () => {
+    const list = filteredIndustries();
+    grid.replaceChildren();
+    if (!list.length) grid.appendChild(el('<span class="dim">No matching industries.</span>'));
+    list.forEach(i => {
+      const verts = verticalsForIndustry(i.id);
+      const c = el(`<div class="card hover">
+        <div class="spread"><h3>${esc(i.name)}</h3><span class="status-pill">${counts[i.id] || 0} use case${(counts[i.id] || 0) === 1 ? '' : 's'}</span></div>
+        <div class="uc-meta">${verts.length} vertical${verts.length === 1 ? '' : 's'}${verts.length ? ' · ' + esc(verts.slice(0, 3).map(v => v.name).join(', ')) + (verts.length > 3 ? '…' : '') : ''}</div>
+        <p class="tiny muted">${esc(i.description) || '<span class="dim">No description.</span>'}</p>
+        <div class="record-actions" style="margin-top:6px">
+          ${manage ? '<button class="btn tiny" data-edit>Edit</button>' : ''}
+          <button class="btn tiny ghost" data-open>Open</button>
+        </div></div>`);
+      if (manage) c.querySelector('[data-edit]').addEventListener('click', () => openEditIndustry(i.id));
+      c.querySelector('[data-open]').addEventListener('click', () => { location.hash = `#/industry/${i.id}`; });
+      grid.appendChild(c);
+    });
+    count.textContent = `COUNT: ${list.length}`;
+  };
+  const fSearch = node.querySelector('#indSearch');
+  fSearch.addEventListener('input', e => { indFilter.search = e.target.value; render(); });
+  node.querySelector('#indClear').addEventListener('click', () => {
+    indFilter.search = ''; fSearch.value = ''; render();
   });
+  render();
   return node;
 }
 function pageIndustry(id) {
@@ -642,89 +669,184 @@ function pageIndustry(id) {
 }
 
 // ---- Solution Plays (browse) ----------------------------------------------
+const spFilter = { search: '' };
 function pageSolutionPlays() {
   const canReg = canCreate('solutionPlay');
-  const list = activeSolutionPlays().sort((a, b) => a.name.localeCompare(b.name));
   const counts = {};
   for (const u of activeUseCases()) if (u.solutionPlay) counts[u.solutionPlay] = (counts[u.solutionPlay] || 0) + 1;
   const node = el(`<div>
     <div class="page-head spread"><div><h1>Solution Plays</h1><p>Microsoft solution plays used across use cases and patterns.</p></div>
       ${canReg ? '<a class="btn primary" href="#/register/solutionplay">+ Register a solution play</a>' : ''}</div>
+    <div class="filterbar">
+      <div class="filter-fields">
+        <label class="filter-field"><span>Search text</span><input id="spSearch" placeholder="Search name, description…" value="${esc(spFilter.search)}"></label>
+      </div>
+      <div class="filter-foot"><button class="btn tiny ghost" id="spClear">Clear filters</button><span class="filter-count" id="spCount"></span></div>
+    </div>
     <div class="grid cols-3" id="spGrid"></div></div>`);
   const grid = node.querySelector('#spGrid');
-  if (!list.length) grid.appendChild(el('<span class="dim">No solution plays yet.</span>'));
-  list.forEach(s => {
-    const c = counts[s.name] || 0;
-    const editable = canEdit('solutionPlay', s);
-    const card = el(`<div class="card hover">
-      <div class="spread"><h3>${esc(s.name)}</h3><span class="status-pill">${c} use case${c === 1 ? '' : 's'}</span></div>
-      <p class="tiny muted">${esc(s.description) || '<span class="dim">No description.</span>'}</p>
-      ${editable ? '<div class="record-actions" style="margin-top:6px"><button class="btn tiny" data-edit>Edit</button></div>' : ''}</div>`);
-    if (editable) card.querySelector('[data-edit]').addEventListener('click', () => openEditSolutionPlay(s.id));
-    grid.appendChild(card);
-  });
+  const count = node.querySelector('#spCount');
+  const render = () => {
+    let list = activeSolutionPlays();
+    if (spFilter.search) {
+      const q = spFilter.search.toLowerCase();
+      list = list.filter(s => [s.name, s.description].join(' ').toLowerCase().includes(q));
+    }
+    list = list.sort((a, b) => a.name.localeCompare(b.name));
+    grid.replaceChildren();
+    if (!list.length) grid.appendChild(el('<span class="dim">No matching solution plays.</span>'));
+    list.forEach(s => {
+      const c = counts[s.name] || 0;
+      const editable = canEdit('solutionPlay', s);
+      const card = el(`<div class="card hover">
+        <div class="spread"><h3>${esc(s.name)}</h3><span class="status-pill">${c} use case${c === 1 ? '' : 's'}</span></div>
+        <p class="tiny muted">${esc(s.description) || '<span class="dim">No description.</span>'}</p>
+        ${editable ? '<div class="record-actions" style="margin-top:6px"><button class="btn tiny" data-edit>Edit</button></div>' : ''}</div>`);
+      if (editable) card.querySelector('[data-edit]').addEventListener('click', () => openEditSolutionPlay(s.id));
+      grid.appendChild(card);
+    });
+    count.textContent = `COUNT: ${list.length}`;
+  };
+  const fSearch = node.querySelector('#spSearch');
+  fSearch.addEventListener('input', e => { spFilter.search = e.target.value; render(); });
+  node.querySelector('#spClear').addEventListener('click', () => { spFilter.search = ''; fSearch.value = ''; render(); });
+  render();
   return node;
 }
 
 // ---- Events (standalone) --------------------------------------------------
+const evFilter = { status: '', format: '', from: '', to: '', search: '' };
 function pageEvents() {
   const manage = canManageEvents();
-  const list = db.events.filter(e => e.recordStatus !== 'Archived').slice()
-    .sort((a, b) => (a.startDate > b.startDate ? 1 : -1));
   const node = el(`<div>
     <div class="page-head spread"><div><h1>Events</h1><p>SLED events and engagements.</p></div>
       ${manage ? '<a class="btn primary" href="#/register/event">+ Add an event</a>' : ''}</div>
+    <div class="filterbar">
+      <div class="filter-fields">
+        <label class="filter-field"><span>Status</span><select class="select" id="fStatus"><option value="">All</option>${opts(EVENT_STATUS, '')}</select></label>
+        <label class="filter-field"><span>Format</span><select class="select" id="fFormat"><option value="">All</option>${opts(EVENT_FORMAT, '')}</select></label>
+        <label class="filter-field"><span>From date</span><input type="date" id="fFrom" value="${esc(evFilter.from)}"></label>
+        <label class="filter-field"><span>To date</span><input type="date" id="fTo" value="${esc(evFilter.to)}"></label>
+        <label class="filter-field"><span>Search text</span><input id="evSearch" placeholder="Search title, location, themes…" value="${esc(evFilter.search)}"></label>
+      </div>
+      <div class="filter-foot"><button class="btn tiny ghost" id="evClear">Clear filters</button><span class="filter-count" id="evCount"></span></div>
+    </div>
     <div class="grid cols-2" id="evGrid"></div></div>`);
   const grid = node.querySelector('#evGrid');
-  if (!list.length) grid.appendChild(el('<span class="dim">No events yet.</span>'));
-  list.forEach(e => {
-    const d = e.startDate ? new Date(e.startDate + 'T00:00:00') : null;
-    const c = el(`<div class="card"><div class="cal-item">
-      <div class="cal-date"><div class="m">${d ? d.toLocaleDateString('en-US', { month: 'short' }) : '—'}</div>
-        <div class="d">${d ? d.getDate() : '—'}</div><div class="y">${d ? d.getFullYear() : ''}</div></div>
-      <div style="flex:1">
-        <div class="spread"><h3>${esc(e.title)}</h3><span class="status-pill">${esc(e.status)}</span></div>
-        <div class="uc-meta">${fmtDate(e.startDate)}${e.endDate ? ' – ' + fmtDate(e.endDate) : ''} · ${esc(e.format)}${e.location ? ' · ' + esc(e.location) : ''}</div>
-        <div class="tag-row" style="margin-top:6px">${tagChips(e.themes)}</div>
-        <div class="record-actions" style="margin-top:8px">
-          ${manage ? '<button class="btn tiny" data-edit>Edit</button>' : ''}
-          <button class="btn tiny ghost" data-audit>History</button>
-          ${manage ? '<button class="btn tiny danger" data-archive>Archive</button>' : ''}</div>
-      </div></div></div>`);
-    if (manage) {
-      c.querySelector('[data-edit]').addEventListener('click', () => openEditEvent(e.id));
-      c.querySelector('[data-archive]').addEventListener('click', () => {
-        if (!confirm('Archive this event?')) return;
-        archiveRecord(e, 'Event'); persistSoon(); toast('Event archived.'); route();
-      });
+  const count = node.querySelector('#evCount');
+  const render = () => {
+    let list = db.events.filter(e => e.recordStatus !== 'Archived');
+    if (evFilter.status) list = list.filter(e => e.status === evFilter.status);
+    if (evFilter.format) list = list.filter(e => e.format === evFilter.format);
+    if (evFilter.from) list = list.filter(e => (e.endDate || e.startDate) >= evFilter.from);
+    if (evFilter.to) list = list.filter(e => e.startDate && e.startDate <= evFilter.to);
+    if (evFilter.search) {
+      const q = evFilter.search.toLowerCase();
+      list = list.filter(e => [e.title, e.location, csv(e.themes), csv(e.organizers), e.notes]
+        .join(' ').toLowerCase().includes(q));
     }
-    c.querySelector('[data-audit]').addEventListener('click', () => openAuditModal(e.id));
-    grid.appendChild(c);
+    list = list.slice().sort((a, b) => (a.startDate > b.startDate ? 1 : -1));
+    grid.replaceChildren();
+    if (!list.length) grid.appendChild(el('<span class="dim">No matching events.</span>'));
+    list.forEach(e => {
+      const d = e.startDate ? new Date(e.startDate + 'T00:00:00') : null;
+      const c = el(`<div class="card"><div class="cal-item">
+        <div class="cal-date"><div class="m">${d ? d.toLocaleDateString('en-US', { month: 'short' }) : '—'}</div>
+          <div class="d">${d ? d.getDate() : '—'}</div><div class="y">${d ? d.getFullYear() : ''}</div></div>
+        <div style="flex:1">
+          <div class="spread"><h3>${esc(e.title)}</h3><span class="status-pill">${esc(e.status)}</span></div>
+          <div class="uc-meta">${fmtDate(e.startDate)}${e.endDate ? ' – ' + fmtDate(e.endDate) : ''} · ${esc(e.format)}${e.location ? ' · ' + esc(e.location) : ''}</div>
+          <div class="tag-row" style="margin-top:6px">${tagChips(e.themes)}</div>
+          <div class="record-actions" style="margin-top:8px">
+            ${manage ? '<button class="btn tiny" data-edit>Edit</button>' : ''}
+            <button class="btn tiny ghost" data-audit>History</button>
+            ${manage ? '<button class="btn tiny danger" data-archive>Archive</button>' : ''}</div>
+        </div></div></div>`);
+      if (manage) {
+        c.querySelector('[data-edit]').addEventListener('click', () => openEditEvent(e.id));
+        c.querySelector('[data-archive]').addEventListener('click', () => {
+          if (!confirm('Archive this event?')) return;
+          archiveRecord(e, 'Event'); persistSoon(); toast('Event archived.'); route();
+        });
+      }
+      c.querySelector('[data-audit]').addEventListener('click', () => openAuditModal(e.id));
+      grid.appendChild(c);
+    });
+    count.textContent = `COUNT: ${list.length}`;
+  };
+  const fStatus = node.querySelector('#fStatus');
+  const fFormat = node.querySelector('#fFormat');
+  const fFrom = node.querySelector('#fFrom');
+  const fTo = node.querySelector('#fTo');
+  const fSearch = node.querySelector('#evSearch');
+  fStatus.value = evFilter.status; fFormat.value = evFilter.format;
+  fStatus.addEventListener('change', e => { evFilter.status = e.target.value; render(); });
+  fFormat.addEventListener('change', e => { evFilter.format = e.target.value; render(); });
+  fFrom.addEventListener('change', e => { evFilter.from = e.target.value; render(); });
+  fTo.addEventListener('change', e => { evFilter.to = e.target.value; render(); });
+  fSearch.addEventListener('input', e => { evFilter.search = e.target.value; render(); });
+  node.querySelector('#evClear').addEventListener('click', () => {
+    Object.assign(evFilter, { status: '', format: '', from: '', to: '', search: '' });
+    fStatus.value = ''; fFormat.value = ''; fFrom.value = ''; fTo.value = ''; fSearch.value = ''; render();
   });
+  render();
   return node;
 }
 
 // ---- Patterns -------------------------------------------------------------
+const patFilter = { repeatability: '', solutionPlay: '', search: '' };
 function pagePatterns() {
-  const list = activePatterns().sort((a, b) => a.name.localeCompare(b.name));
   const node = el(`<div>
     <div class="page-head spread"><div><h1>Patterns</h1><p>Reusable solution patterns and accelerators.</p></div>
       ${canCreate('pattern') ? '<a class="btn primary" href="#/register/pattern">+ Define a pattern</a>' : ''}</div>
+    <div class="filterbar">
+      <div class="filter-fields">
+        <label class="filter-field"><span>Repeatability</span><select class="select" id="fRepeat"><option value="">All</option>${opts(REPEATABILITY, '')}</select></label>
+        <label class="filter-field"><span>Solution Play</span><select class="select" id="fPlay"><option value="">All</option>${solutionPlayNames().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select></label>
+        <label class="filter-field"><span>Search text</span><input id="patSearch" placeholder="Search name, summary, components…" value="${esc(patFilter.search)}"></label>
+      </div>
+      <div class="filter-foot"><button class="btn tiny ghost" id="patClear">Clear filters</button><span class="filter-count" id="patCount"></span></div>
+    </div>
     <div class="grid cols-3" id="patGrid"></div></div>`);
   const grid = node.querySelector('#patGrid');
-  if (!list.length) grid.appendChild(el('<span class="dim">No patterns yet.</span>'));
-  list.forEach(p => {
-    const ucCount = useCasesForPattern(p.id).length;
-    const accCount = acceleratorsForPattern(p.id).length;
-    const c = el(`<div class="card hover">
-      <div class="spread"><h3>${esc(p.name)}</h3><span class="chip ${p.repeatability === 'High' ? 'good' : ''}">${esc(p.repeatability)}</span></div>
-      <p class="tiny muted">${esc(p.summary)}</p>
-      <div class="tag-row">${tagChips(p.components)}</div>
-      <div class="divider"></div>
-      <div class="tiny dim">${ucCount} use case${ucCount === 1 ? '' : 's'} · ${accCount} accelerator${accCount === 1 ? '' : 's'}</div></div>`);
-    c.addEventListener('click', () => { location.hash = `#/pattern/${p.id}`; });
-    grid.appendChild(c);
+  const count = node.querySelector('#patCount');
+  const render = () => {
+    let list = activePatterns();
+    if (patFilter.repeatability) list = list.filter(p => p.repeatability === patFilter.repeatability);
+    if (patFilter.solutionPlay) list = list.filter(p => p.solutionPlay === patFilter.solutionPlay);
+    if (patFilter.search) {
+      const q = patFilter.search.toLowerCase();
+      list = list.filter(p => [p.name, p.summary, csv(p.components), p.solutionPlay].join(' ').toLowerCase().includes(q));
+    }
+    list = list.sort((a, b) => a.name.localeCompare(b.name));
+    grid.replaceChildren();
+    if (!list.length) grid.appendChild(el('<span class="dim">No matching patterns.</span>'));
+    list.forEach(p => {
+      const ucCount = useCasesForPattern(p.id).length;
+      const accCount = acceleratorsForPattern(p.id).length;
+      const c = el(`<div class="card hover">
+        <div class="spread"><h3>${esc(p.name)}</h3><span class="chip ${p.repeatability === 'High' ? 'good' : ''}">${esc(p.repeatability)}</span></div>
+        <p class="tiny muted">${esc(p.summary)}</p>
+        <div class="tag-row">${tagChips(p.components)}</div>
+        <div class="divider"></div>
+        <div class="tiny dim">${ucCount} use case${ucCount === 1 ? '' : 's'} · ${accCount} accelerator${accCount === 1 ? '' : 's'}</div></div>`);
+      c.addEventListener('click', () => { location.hash = `#/pattern/${p.id}`; });
+      grid.appendChild(c);
+    });
+    count.textContent = `COUNT: ${list.length}`;
+  };
+  const fRepeat = node.querySelector('#fRepeat');
+  const fPlay = node.querySelector('#fPlay');
+  const fSearch = node.querySelector('#patSearch');
+  fRepeat.value = patFilter.repeatability; fPlay.value = patFilter.solutionPlay;
+  fRepeat.addEventListener('change', e => { patFilter.repeatability = e.target.value; render(); });
+  fPlay.addEventListener('change', e => { patFilter.solutionPlay = e.target.value; render(); });
+  fSearch.addEventListener('input', e => { patFilter.search = e.target.value; render(); });
+  node.querySelector('#patClear').addEventListener('click', () => {
+    Object.assign(patFilter, { repeatability: '', solutionPlay: '', search: '' });
+    fRepeat.value = ''; fPlay.value = ''; fSearch.value = ''; render();
   });
+  render();
   return node;
 }
 function pagePattern(id) {

@@ -48,6 +48,6 @@
     <span>SLED Use Case Library &mdash; internal Microsoft catalog of reusable SLED use cases. Prototype &middot; <a href="#/about" style="color:inherit;text-decoration:underline">About</a></span>
   </footer>
 
-  <script type="module" src="js/app.js?v=10"></script>
+  <script type="module" src="js/app.js?v=11"></script>
 </body>
 </html>
