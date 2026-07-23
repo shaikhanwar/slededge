@@ -17,8 +17,10 @@ flowchart TD
         subgraph Site[SharePoint Site · SLED Use Case Library / SLED Edge]
             app["Single-page app<br/>SiteAssets/sled/index.aspx"]
             page["(Optional) Modern Site Page<br/>with Embed web part"]
-            subgraph Lists[Six SharePoint Lists + 1 Library]
+            subgraph Lists[Eight SharePoint Lists + 1 Library]
                 l1[(SLEDIndustries)]
+                l7[(SLEDVerticals)]
+                l8[(SLEDSolutionPlays)]
                 l2[(SLEDUseCases)]
                 l3[(SLEDEvents)]
                 l4[(SLEDPatterns)]
@@ -36,7 +38,7 @@ flowchart TD
     curator([Curator]) -->|manage all| app
 
     page -->|iframe embed| app
-    app <-->|same-origin REST| l1 & l2 & l3 & l4 & l5 & l6
+    app <-->|same-origin REST| l1 & l2 & l3 & l4 & l5 & l6 & l7 & l8
     app <-->|upload / download artifacts| lib
 
     l2 -->|Status = In Review| flow
@@ -55,7 +57,7 @@ host and chooses the data source — no code change between DEV and PROD.
 ```mermaid
 flowchart TD
     start([App loads: index.aspx / index.html]) --> detect{"Host is<br/>*.sharepoint.com ?"}
-    detect -->|Yes| live["Live mode:<br/>read/write six lists<br/>via same-origin REST"]
+    detect -->|Yes| live["Live mode:<br/>read/write eight lists<br/>via same-origin REST"]
     detect -->|No| demo["Demo mode:<br/>read seed JSON in app/data/<br/>persist edits to localStorage"]
     live --> render[Render pages]
     demo --> render
@@ -100,7 +102,7 @@ sequenceDiagram
 flowchart LR
     subgraph DEV[DEV site]
         d1[Create Communication site] --> d2[Allow custom script]
-        d2 --> d3[Provision six lists<br/>Site Designs PowerShell]
+        d2 --> d3[Provision eight lists<br/>Site Designs PowerShell]
         d3 --> d4[Upload app/ to SiteAssets/sled]
         d4 --> d5[Open index.aspx<br/>+ optional nav / embed]
         d5 --> d6[Validate round-trip saves]

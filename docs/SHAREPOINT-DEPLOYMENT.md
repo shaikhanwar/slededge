@@ -9,7 +9,7 @@ consent, no F12 browser console**). Everything else is done in the browser.
 > own tenant root and site. This guide uses a site named `SLEDUseCaseLibrary` as
 > the example.
 
-**What you'll end up with:** seven `SLED*` lists + one document library → the app at
+**What you'll end up with:** eight `SLED*` lists + one document library → the app at
 `…/SiteAssets/sled/index.aspx`, whose own pages browse, register and edit every
 entity and write back to the lists over same-origin REST.
 
@@ -69,7 +69,7 @@ script to be **allowed** on the site.
 
 ## Step 3 — Provision the lists
 
-Creates the seven `SLED*` lists (plain Text/Note columns — the app stores booleans
+Creates the eight `SLED*` lists (plain Text/Note columns — the app stores booleans
 as `Yes`/`No` and multi-values as `; `-joined text) plus the
 `SLEDSolutionArchitecture` document library. Uses **Site Designs / Site Scripts**
 through the management shell. Each column is declared with an explicit Field XML
@@ -94,10 +94,10 @@ pwsh -File ./provision-sled-via-sitedesign.ps1 `
   `-SkipLibrary` and create `SLEDSolutionArchitecture` by hand
   (**Site contents → New → Document library**).
 
-Expected tail: `Lists OK: 6 | failed: 0` → `Done.`
+Expected tail: `Lists OK: 8 | failed: 0` → `Done.`
 
 **Verify (GUI):** **Site contents** shows `SLEDIndustries`, `SLEDVerticals`,
-`SLEDUseCases`, `SLEDEvents`, `SLEDPatterns`, `SLEDAccelerators`, `SLEDAuditLog`, and the
+`SLEDSolutionPlays`, `SLEDUseCases`, `SLEDEvents`, `SLEDPatterns`, `SLEDAccelerators`, `SLEDAuditLog`, and the
 `SLEDSolutionArchitecture` library. Column *internal* names are **unprefixed**
 (e.g. `IndustryId`, `VerticalId`, `BusinessProblem`) — the app addresses them by those exact
 names.
@@ -229,7 +229,7 @@ Keep internal names **identical** so everything ports:
 
 | Artifact | Method |
 |---|---|
-| Six lists + columns | Re-run the provisioning script against the SLED Edge site |
+| Eight lists + columns | Re-run the provisioning script against the SLED Edge site |
 | App files | Re-upload [`app/`](../app/) to `SiteAssets/sled` (no code changes) |
 | Approval flow | Recreate/repoint to the PROD `SLEDUseCases` list (connection change only) |
 | Content | Re-register curated items in the app, or copy items between lists |

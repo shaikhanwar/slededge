@@ -78,4 +78,4 @@ iframe it without any allow-listing.
   to feel like a native hub page with the suite bar, search and theme around it.
 
 You can ship **both** and link each where it fits — they read and write the same
-six lists.
+lists.

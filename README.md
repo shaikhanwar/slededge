@@ -1,16 +1,18 @@
 # SLED Use Case Library (SLEDEdge)
 
-An internal Microsoft catalog of **reusable use cases** across the five SLED
-verticals — **State & Local Government, Public Safety & Justice, Public Health &
-Social Services, Transportation & Urban Infrastructure, and Education.** It lets
-Microsoft teams **contribute** use cases, **browse** them by industry / segment /
-keyword, and **reuse** proven scenarios — surfaced through a modern SharePoint
-Online page inside the **SLED Edge** GTM hub.
+An internal Microsoft catalog of **reusable use cases** across the SLED
+industries — **State & Local Government, Public Safety & Justice, Public Health &
+Social Services, Transportation & Urban Infrastructure, and Education** — each
+broken down into its own **verticals**. It lets Microsoft teams **contribute**
+use cases, **browse** them by industry / vertical / solution play / keyword, and
+**reuse** proven scenarios — surfaced through a SharePoint Online page inside the
+**SLED Edge** GTM hub.
 
-Delivered entirely on **Microsoft 365 no-code / low-code**: six SharePoint
+Delivered entirely on **Microsoft 365 no-code / low-code**: eight SharePoint
 **Lists** (data) + a zero-build, single-page app (`index.aspx`) that browses,
-registers and edits every entity over same-origin REST, with an optional Power
-Automate approval flow.
+registers and edits every entity over same-origin REST, with a **built-in
+approval workflow** (contributor submissions wait for owner/approver sign-off)
+and an optional Power Automate flow.
 
 > **No build step, no SPFx, no app registration.** The app is plain ES modules.
 > On `*.sharepoint.com` it reads/writes the live lists; anywhere else
@@ -26,7 +28,7 @@ Automate approval flow.
 ## Table of contents
 
 1. [Features](#features)
-2. [The six SharePoint lists](#the-six-sharepoint-lists)
+2. [The SharePoint lists](#the-sharepoint-lists)
 3. [Repository layout](#repository-layout)
 4. [Run locally](#run-locally)
 5. [Architecture & flow diagrams](#architecture--flow-diagrams)
@@ -39,31 +41,43 @@ Automate approval flow.
 
 ## Features
 
-- **Home** — KPIs / coverage across the five verticals.
-- **Use Cases** — browse with a horizontal filter bar (Industry, Segment,
+- **Home** — KPIs / coverage across the SLED industries.
+- **Use Cases** — browse with a horizontal filter bar (Industry, Vertical,
   Solution Play, Status, Tags, Search) + detail tabs (Overview, Solution & Tech,
   Value & Impact, Owner & Artifacts).
-- **Industries** — the five fixed SLED verticals.
+- **Industries** — the SLED industries, each with its own child **Verticals**.
+- **Solution Plays** — a data-driven, registrable list of Microsoft solution
+  plays used by use cases and patterns (no longer hardcoded).
 - **Events** — a standalone events catalog.
 - **Patterns / Solution accelerators** — reusable assets, templates and repos.
+- **Approvals** — an Owner/Approver review queue: content submitted by
+  contributors is held **Pending** until approved (or rejected with a reason).
 - **Audit** — soft archive / restore with a chronological change log.
 - **Register hub** — guided multi-step forms for every entity that write back to
   the lists over REST.
-- **Role-aware UI** — Viewer / Contributor / Curator, resolved from SharePoint
-  group membership and list permissions ([`app/js/auth.js`](app/js/auth.js)).
+- **Role-aware UI + approval workflow** — Viewer / Contributor / Curator,
+  resolved from SharePoint group membership and list permissions
+  ([`app/js/auth.js`](app/js/auth.js)). Contributor create/edit is queued for
+  approval; Curators approve and manage the taxonomy.
 
-## The six SharePoint lists
+## The SharePoint lists
 
 | List | Holds |
 |---|---|
-| `SLEDIndustries` | The five SLED verticals |
-| `SLEDUseCases` | The use case system of record |
+| `SLEDIndustries` | The SLED industries |
+| `SLEDVerticals` | Verticals, each linked to a parent industry |
+| `SLEDSolutionPlays` | Data-driven Microsoft solution plays |
+| `SLEDUseCases` | The use case system of record (links to an industry + vertical) |
 | `SLEDEvents` | Standalone events |
 | `SLEDPatterns` | Reusable patterns |
 | `SLEDAccelerators` | Solution accelerators / templates |
 | `SLEDAuditLog` | Change / archive log |
 
 Plus a `SLEDSolutionArchitecture` document library for per-record artifacts.
+
+Industries, Verticals, Solution Plays, Use Cases, Patterns and Accelerators each
+carry **approval columns** (`ApprovalStatus`, `SubmittedByName`, …) so
+contributor submissions can be held for owner/approver review.
 
 ---
 
@@ -80,9 +94,11 @@ SLEDEdge/
     SHAREPOINT-DEPLOYMENT.md         step-by-step deployment guide
     EMBED-IN-MODERN-PAGES.md         optional modern-page embedding
   lists/
-    sled-list-schema.json            canonical six-list column definitions
+    sled-list-schema.json            canonical column definitions (all lists)
     provision-sled-via-sitedesign.ps1  PowerShell Site Designs provisioner (no PnP)
     provision-sled-list-browser.js   browser-console provisioner (no PnP)
+    seed-sled-data-browser.js        browser-console demo-data seeder
+    clear-sled-data-browser.js       browser-console data reset (clears all SLED* lists)
   app/
     index.aspx                       SharePoint host page (renders on SPO)
     index.html                       local-preview host page
@@ -124,8 +140,10 @@ flowchart TD
         subgraph Site[SharePoint Site · SLED Use Case Library / SLED Edge]
             app["Single-page app<br/>SiteAssets/sled/index.aspx"]
             page["(Optional) Modern Site Page<br/>with Embed web part"]
-            subgraph Lists[Six SharePoint Lists + 1 Library]
+            subgraph Lists[Eight SharePoint Lists + 1 Library]
                 l1[(SLEDIndustries)]
+                l7[(SLEDVerticals)]
+                l8[(SLEDSolutionPlays)]
                 l2[(SLEDUseCases)]
                 l3[(SLEDEvents)]
                 l4[(SLEDPatterns)]
@@ -143,7 +161,7 @@ flowchart TD
     curator([Curator]) -->|manage all| app
 
     page -->|iframe embed| app
-    app <-->|same-origin REST| l1 & l2 & l3 & l4 & l5 & l6
+    app <-->|same-origin REST| l1 & l2 & l3 & l4 & l5 & l6 & l7 & l8
     app <-->|upload / download artifacts| lib
 
     l2 -->|Status = In Review| flow
@@ -176,24 +194,26 @@ flowchart TD
 sequenceDiagram
     actor C as Contributor
     participant App as App (Register form)
-    participant L as SLEDUseCases list
-    participant F as Power Automate
-    actor R as Curator / Approver
+    participant L as SLED list (Use Case / Pattern / …)
+    participant Ap as Approvals tab
+    actor R as Curator / Owner
 
-    C->>App: Fill "Register a Use Case"
-    App->>L: Create item (Status = In Review)
-    L-->>F: Trigger (item created/modified, Status = In Review)
-    F->>R: Start & wait for approval (Teams/email)
-    alt Approved
-        R-->>F: Approve
-        F->>L: Update Status = Published
-        Note over L: Visible in the main library
-    else Rejected
-        R-->>F: Reject with comments
-        F->>L: Update Status = Draft
-        F->>C: Notify with reviewer comments
+    C->>App: Submit (Use Case, Pattern, Accelerator or Solution Play)
+    App->>L: Create/update item (ApprovalStatus = Pending)
+    Note over L: Hidden from the public catalog while Pending
+    R->>Ap: Open Approvals (Owners/Approvers only)
+    alt Approve
+        Ap->>L: ApprovalStatus = Approved
+        Note over L: Now visible in the catalog
+    else Reject
+        Ap->>L: ApprovalStatus = Rejected (+ reason)
+        Note over L: Stays hidden; kept for audit
     end
 ```
+
+> Curator/Owner submissions publish immediately (no self-approval needed). The
+> in-app Approvals queue is the primary workflow; the optional Power Automate
+> flow (Step 8) can layer on Teams/email notifications.
 
 ### 4. Deployment flow (DEV → PROD)
 
@@ -201,7 +221,7 @@ sequenceDiagram
 flowchart LR
     subgraph DEV[DEV site]
         d1[Create Communication site] --> d2[Allow custom script]
-        d2 --> d3[Provision six lists<br/>Site Designs PowerShell]
+        d2 --> d3[Provision eight lists<br/>Site Designs PowerShell]
         d3 --> d4[Upload app/ to SiteAssets/sled]
         d4 --> d5[Open index.aspx<br/>+ optional nav / embed]
         d5 --> d6[Validate round-trip saves]
@@ -269,12 +289,14 @@ script to be **allowed** on the site.
 
 > PowerShell equivalent: `Set-SPOSite -Identity <siteUrl> -DenyAddAndCustomizePages 0`.
 
-### Step 3 — Provision the six lists
+### Step 3 — Provision the lists
 
-Creates the six `SLED*` lists (plain Text/Note columns — booleans stored as
+Creates the eight `SLED*` lists (plain Text/Note columns — booleans stored as
 `Yes`/`No`, multi-values as `; `-joined text) plus the `SLEDSolutionArchitecture`
 library. Each column has an explicit Field XML internal name so REST round-trips
-never hit a "field does not exist" error.
+never hit a "field does not exist" error. The script is idempotent — re-run it
+after pulling updates to add any new lists/columns (e.g. Verticals, Solution
+Plays, approval columns).
 
 ```powershell
 cd ./lists
@@ -291,12 +313,17 @@ pwsh -File ./provision-sled-via-sitedesign.ps1 `
 - If your tenant blocks doc-library creation via Site Design, re-run with
   `-SkipLibrary` and create `SLEDSolutionArchitecture` by hand.
 
-Expected tail: `Lists OK: 6 | failed: 0` → `Done.`
+Expected tail: `Lists OK: 8 | failed: 0` → `Done.`
 
-**Verify:** **Site contents** shows the six `SLED*` lists + the
+**Verify:** **Site contents** shows the eight `SLED*` lists — `SLEDIndustries`,
+`SLEDVerticals`, `SLEDSolutionPlays`, `SLEDUseCases`, `SLEDEvents`,
+`SLEDPatterns`, `SLEDAccelerators`, `SLEDAuditLog` — plus the
 `SLEDSolutionArchitecture` library. Column *internal* names are **unprefixed**
-(e.g. `IndustryId`, `BusinessProblem`) — the app addresses them by those exact
-names.
+(e.g. `IndustryId`, `VerticalId`, `BusinessProblem`) — the app addresses them by
+those exact names.
+
+> Runs in **Windows PowerShell 5.1** or **PowerShell 7** — the script imports the
+> SPO module the right way for whichever you use.
 
 > **Alternative (no admin shell):** paste
 > [`lists/provision-sled-list-browser.js`](lists/provision-sled-list-browser.js)
@@ -311,14 +338,17 @@ so a disallowed write fails with 403). The app mirrors the user's role in the UI
 
 | Role | SharePoint group (permission level) | Can do |
 |---|---|---|
-| **Viewer** | `SLED Visitors` (**Read**) | Browse everything; download artifacts |
-| **Contributor** | `SLED Members` (**Contribute**) | Create use cases; edit/archive their own |
-| **Curator** | `SLED Curators` (**Edit**) | Edit/archive any record; manage all entities |
+| **Viewer** | Visitors (**Read**) | Browse everything; download artifacts |
+| **Contributor** | Members (**Contribute** or **Edit**) | Create Use Cases, Patterns, Accelerators and Solution Plays (all **queued for approval**); edit their own |
+| **Curator / Owner** | Owners (**Full Control**) | Everything: edit/archive any record, manage Industries / Verticals / Events, and **approve or reject** submissions |
 
 1. Site → **Settings ⚙ → Site permissions → Advanced permissions settings**.
-2. Create (or reuse) the three groups above with the listed permission levels.
-3. Add people to each group. Site Collection Admins are always Curator. Lists and
-   the library inherit site permissions — no per-list changes required.
+2. Use the site's default **Owners / Members / Visitors** groups (or create groups
+   whose names contain *Owner*, *Member/Contributor*, or *Visitor*).
+3. Add people to each group. **Group membership decides the role** — anyone in an
+   *Owners*/*Curator* group (or a Site Collection Admin) is a Curator/Approver;
+   *Members* are Contributors; *Visitors* are read-only. Lists and the library
+   inherit site permissions — no per-list changes required.
 
 ### Step 5 — Deploy the app files
 
@@ -352,13 +382,21 @@ Open the app:
 
 ### Step 7 — Seed & validate
 
-1. **Register:** **+ Register → Register a Use Case** → pick an Industry, fill
-   the form → **Create use case**; confirm it round-trips to `SLEDUseCases`.
-2. **Browse/filter:** try the Industry / Segment / Status filters and search.
-3. **Detail tabs:** Overview / Solution & Tech / Value & Impact / Owner &
-   Artifacts.
-4. **Industries / Events / Patterns:** confirm each lists its records.
-5. **Audit:** archive a record, confirm it appears under **Audit**, then restore.
+1. **(Optional) Seed demo data:** open any page on the site → **F12 → Console** →
+   paste [`lists/seed-sled-data-browser.js`](lists/seed-sled-data-browser.js). It
+   creates a consistent set of Industries, Verticals, Solution Plays, Use Cases,
+   Patterns and Accelerators (idempotent). To wipe and start over, run
+   [`lists/clear-sled-data-browser.js`](lists/clear-sled-data-browser.js) first.
+2. **Register:** **+ Register → Register a Use Case** → pick an Industry, then a
+   **Vertical** and **Solution Play** → **Create use case**; confirm it
+   round-trips to `SLEDUseCases`.
+3. **Browse/filter:** try the Industry / Vertical / Status filters and search.
+4. **Solution Plays / Industries / Events / Patterns:** confirm each lists its
+   records; add a Solution Play and see it appear in the use-case dropdown.
+5. **Approvals:** as a Contributor (a *Member*), register a use case — it's held
+   **Pending**; as a Curator/Owner, open the **Approvals** tab → **Approve** (it
+   appears in the catalog) or **Reject** (with a reason).
+6. **Audit:** archive a record, confirm it appears under **Audit**, then restore.
 
 ### Step 8 — (Optional) Approval flow in Power Automate
 
@@ -383,7 +421,7 @@ Keep internal names **identical** so everything ports:
 
 | Artifact | Method |
 |---|---|
-| Six lists + columns | Re-run the provisioning script against the SLED Edge site |
+| Eight lists + columns | Re-run the provisioning script against the SLED Edge site |
 | App files | Re-upload [`app/`](app/) to `SiteAssets/sled` (no code changes) |
 | Approval flow | Recreate/repoint to the PROD `SLEDUseCases` list (connection change only) |
 | Content | Re-register curated items in the app, or copy items between lists |
