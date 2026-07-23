@@ -12,7 +12,7 @@ import {
 } from './store.js';
 
 export const db = {
-  industries: [], useCases: [], events: [], patterns: [], accelerators: [], audit: [],
+  industries: [], verticals: [], solutionPlays: [], useCases: [], events: [], patterns: [], accelerators: [], audit: [],
   byId: {}
 };
 
@@ -28,7 +28,7 @@ function param(name) {
 
 function reindex() {
   db.byId = {};
-  for (const key of ['industries', 'useCases', 'events', 'patterns', 'accelerators']) {
+  for (const key of ['industries', 'verticals', 'solutionPlays', 'useCases', 'events', 'patterns', 'accelerators']) {
     for (const r of db[key]) db.byId[r.id] = r;
   }
 }
@@ -53,17 +53,52 @@ export async function loadData() {
 // ---- Lookups --------------------------------------------------------------
 export const industry = (id) => db.byId[id] || null;
 export const industryName = (id) => (db.byId[id]?.name) || '—';
+export const vertical = (id) => db.byId[id] || null;
+export const verticalName = (id) => (db.byId[id]?.name) || '—';
 export const pattern = (id) => db.byId[id] || null;
 export const patternName = (id) => (db.byId[id]?.name) || '—';
 
-export const useCasesForIndustry = (industryId) =>
-  db.useCases.filter(u => u.industryId === industryId && u.recordStatus !== 'Archived');
-export const useCasesForPattern = (patternId) =>
-  db.useCases.filter(u => u.patternId === patternId && u.recordStatus !== 'Archived');
-export const acceleratorsForPattern = (patternId) =>
-  db.accelerators.filter(a => a.patternId === patternId);
+// ---- Approval helpers -----------------------------------------------------
+// A record counts as "approved" (visible in the public catalog) when it is not
+// awaiting review or rejected. Missing status (legacy/seed) is treated approved.
+export const isApproved = (rec) => !rec || (rec.approvalStatus || 'Approved') === 'Approved';
+export const isPending = (rec) => !!rec && rec.approvalStatus === 'Pending';
+export const isRejected = (rec) => !!rec && rec.approvalStatus === 'Rejected';
+// Live in the catalog = active + approved.
+const inCatalog = (rec) => rec.recordStatus !== 'Archived' && isApproved(rec);
 
-export const activeUseCases = () => db.useCases.filter(u => u.recordStatus !== 'Archived');
+// Every item awaiting Owner/Approver review, newest first.
+export function pendingItems() {
+  const out = [];
+  const push = (list, type) => list.filter(isPending).forEach(rec => out.push({ rec, type }));
+  push(db.industries, 'Industry');
+  push(db.verticals, 'Vertical');
+  push(db.solutionPlays, 'Solution play');
+  push(db.useCases, 'Use case');
+  push(db.patterns, 'Pattern');
+  push(db.accelerators, 'Accelerator');
+  return out.sort((a, b) => (String(a.rec.submittedAt) < String(b.rec.submittedAt) ? 1 : -1));
+}
+export const pendingCount = () => pendingItems().length;
+
+// Verticals belonging to an industry (approved + active), for pickers/detail.
+export const verticalsForIndustry = (industryId) =>
+  db.verticals.filter(v => v.industryId === industryId && inCatalog(v))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+export const useCasesForIndustry = (industryId) =>
+  db.useCases.filter(u => u.industryId === industryId && inCatalog(u));
+export const useCasesForVertical = (verticalId) =>
+  db.useCases.filter(u => u.verticalId === verticalId && inCatalog(u));
+export const useCasesForPattern = (patternId) =>
+  db.useCases.filter(u => u.patternId === patternId && inCatalog(u));
+export const acceleratorsForPattern = (patternId) =>
+  db.accelerators.filter(a => a.patternId === patternId && isApproved(a) && a.recordStatus !== 'Archived');
+
+export const activeUseCases = () => db.useCases.filter(inCatalog);
+export const activeIndustries = () => db.industries.filter(inCatalog);
+export const activePatterns = () => db.patterns.filter(inCatalog);
+export const activeSolutionPlays = () => db.solutionPlays.filter(inCatalog);
 
 // ---- Owner helpers --------------------------------------------------------
 export const hasOwner = (uc) => !!(uc.ownerName || uc.ownerEmail);
@@ -75,10 +110,10 @@ export function programMetrics() {
   const ucs = activeUseCases();
   return {
     useCases: ucs.length,
-    industries: db.industries.filter(i => i.recordStatus !== 'Archived').length,
+    industries: activeIndustries().length,
     published: ucs.filter(u => u.status === 'Published').length,
     inReview: ucs.filter(u => u.status === 'In Review').length,
-    patterns: db.patterns.filter(p => p.recordStatus !== 'Archived').length,
+    patterns: activePatterns().length,
     upcoming: db.events.filter(e => e.recordStatus !== 'Archived' && e.status !== 'Closed').length
   };
 }

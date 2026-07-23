@@ -1,12 +1,13 @@
 // app.js — hash router + page renderers for the SLED Use Case Library.
 import {
-  loadData, db, industry, industryName, pattern, patternName,
-  useCasesForIndustry, useCasesForPattern, acceleratorsForPattern, activeUseCases,
+  loadData, db, industry, industryName, vertical, verticalName, pattern, patternName,
+  useCasesForIndustry, useCasesForVertical, useCasesForPattern, acceleratorsForPattern, activeUseCases,
+  verticalsForIndustry, activeIndustries, activePatterns, activeSolutionPlays, pendingItems, pendingCount, isApproved, isPending, isRejected,
   hasOwner, ownerDisplay, programMetrics, industryCounts,
   isSharePointMode, isLocalMode, persist, persistSoon, resetDemo, onPersist, reindex
 } from './data.js';
 import {
-  buildIndustry, buildUseCase, buildEvent, buildPattern, buildAccelerator, nextId
+  buildIndustry, buildVertical, buildSolutionPlay, buildUseCase, buildEvent, buildPattern, buildAccelerator, nextId
 } from './factory.js';
 import {
   listDocuments, uploadDocument, deleteDocument,
@@ -14,10 +15,11 @@ import {
 } from './docs.js';
 import {
   loadIdentity, identity, role, roleLabel, currentUserName, setDemoRole, ROLES,
-  canCreate, canEdit, canUpload, canManageTaxonomy, canManageEvents, isViewer
+  canCreate, canEdit, canUpload, canManageTaxonomy, canManageEvents, canApprove,
+  isViewer, isContributor, isCurator
 } from './auth.js';
 import {
-  VERTICALS, SEGMENTS, SOLUTION_PLAYS, STATUSES, TAGS, REPEATABILITY,
+  APPROVAL_STATUS, STATUSES, TAGS, REPEATABILITY,
   ACCELERATOR_TYPES, EVENT_STATUS, EVENT_FORMAT, STATUS_CLASS
 } from './constants.js';
 
@@ -66,11 +68,38 @@ const savedNote = () => isSharePointMode() ? 'Saved to SharePoint.' : 'Saved (de
 const opts = (values, selected) => values.map(v =>
   `<option value="${esc(v)}"${String(v) === String(selected) ? ' selected' : ''}>${esc(v)}</option>`).join('');
 const industryOptions = (selected) => `<option value="">— Select —</option>` +
-  db.industries.filter(i => i.recordStatus !== 'Archived')
-    .map(i => `<option value="${esc(i.id)}"${i.id === selected ? ' selected' : ''}>${esc(i.name)}${i.segment ? ' · ' + esc(i.segment) : ''}</option>`).join('');
+  db.industries.filter(i => i.recordStatus !== 'Archived' && isApproved(i))
+    .map(i => `<option value="${esc(i.id)}"${i.id === selected ? ' selected' : ''}>${esc(i.name)}</option>`).join('');
+// Verticals for a given industry (approved + active). Used by the dependent
+// Industry → Vertical picker on the use-case form.
+const verticalOptions = (industryId, selected) => `<option value="">— Select —</option>` +
+  verticalsForIndustry(industryId)
+    .map(v => `<option value="${esc(v.id)}"${v.id === selected ? ' selected' : ''}>${esc(v.name)}</option>`).join('');
 const patternOptions = (selected) => `<option value="">— None —</option>` +
-  db.patterns.filter(p => p.recordStatus !== 'Archived')
+  db.patterns.filter(p => p.recordStatus !== 'Archived' && isApproved(p))
     .map(p => `<option value="${esc(p.id)}"${p.id === selected ? ' selected' : ''}>${esc(p.name)}</option>`).join('');
+// Solution plays are fully data-driven (approved records only). If the list is
+// empty (e.g. right after a data clear), the dropdown is empty until plays are
+// registered/seeded — nothing is hardcoded.
+const solutionPlayNames = () => activeSolutionPlays().map(p => p.name).sort((a, b) => a.localeCompare(b));
+const solutionPlaySelect = (selected) => `<option value="">— Select —</option>` +
+  solutionPlayNames().map(n => `<option value="${esc(n)}"${n === selected ? ' selected' : ''}>${esc(n)}</option>`).join('');
+
+// Wire a dependent Industry → Vertical pair of selects inside a form: whenever
+// the industry changes, the vertical options are rebuilt for that industry.
+function wireIndustryVertical(scope, currentVerticalId) {
+  const ind = scope.querySelector('[name="industryId"]');
+  const ver = scope.querySelector('[name="verticalId"]');
+  if (!ind || !ver) return;
+  const fill = (keep) => { ver.innerHTML = verticalOptions(ind.value, keep || ''); };
+  fill(currentVerticalId);
+  ind.addEventListener('change', () => fill(''));
+}
+
+// Small pending/rejected badge for a record's approval state.
+const approvalBadge = (rec) => isPending(rec)
+  ? '<span class="badge review">Pending approval</span>'
+  : (isRejected(rec) ? '<span class="badge draft">Rejected</span>' : '');
 
 const statusBadge = (status) => `<span class="badge ${STATUS_CLASS[status] || 'draft'}">${esc(status || 'Draft')}</span>`;
 const csv = (a) => (Array.isArray(a) ? a : []).join(', ');
@@ -104,6 +133,37 @@ function restoreRecord(rec, type) {
   rec.recordStatus = 'Active'; rec.modifiedBy = currentUserName(); rec.modifiedAt = nowIso();
   logAudit(rec, type, 'Restored', `${type} restored.`);
 }
+
+// ---- Approval workflow ----------------------------------------------------
+// Curators (Owners/Approvers) publish immediately; Contributor create/edit is
+// held as 'Pending' until an approver reviews it on the Approvals page.
+// Returns 'Approved' | 'Pending' so callers can tailor the toast.
+function applyApproval(rec, type, { isNew }) {
+  if (isCurator()) {
+    rec.approvalStatus = 'Approved';
+    if (isNew) { rec.submittedBy = currentUserName(); rec.submittedAt = nowIso(); }
+    rec.reviewedBy = currentUserName(); rec.reviewedAt = nowIso();
+    return 'Approved';
+  }
+  rec.approvalStatus = 'Pending';
+  rec.submittedBy = currentUserName(); rec.submittedAt = nowIso();
+  rec.reviewedBy = ''; rec.reviewedAt = ''; rec.reviewNote = '';
+  logAudit(rec, type, 'Submitted', `${type} submitted for approval.`);
+  return 'Pending';
+}
+function approveRecord(rec, type) {
+  rec.approvalStatus = 'Approved'; rec.reviewedBy = currentUserName(); rec.reviewedAt = nowIso();
+  rec.modifiedBy = currentUserName(); rec.modifiedAt = nowIso();
+  logAudit(rec, type, 'Approved', `Approved by ${currentUserName()}.`);
+}
+function rejectRecord(rec, type, note) {
+  rec.approvalStatus = 'Rejected'; rec.reviewedBy = currentUserName(); rec.reviewedAt = nowIso();
+  rec.reviewNote = note || ''; rec.modifiedBy = currentUserName(); rec.modifiedAt = nowIso();
+  logAudit(rec, type, 'Rejected', note ? `Rejected: ${note}` : 'Rejected.');
+}
+// Toast text after a create/edit, honouring the approval outcome.
+const submitToast = (state, approvedMsg) =>
+  state === 'Pending' ? 'Submitted for approval — an approver will review it shortly.' : `${approvedMsg} ${savedNote()}`;
 const auditFor = (recordId) => db.audit.filter(a => a.recordId === recordId).sort((a, b) => (a.at < b.at ? 1 : -1));
 const actionTone = (a) => ({ Created: 'good', Updated: 'info', Archived: 'warn', Restored: 'info', Deleted: 'danger' }[a] || '');
 
@@ -174,9 +234,12 @@ function pageHome() {
           <h3>Quick actions</h3>
           <ul class="numbered-links">
             ${canCreate('useCase') ? '<li><a href="#/register/usecase"><span class="n">1</span> Register a use case</a></li>' : ''}
-            ${canManageTaxonomy() ? '<li><a href="#/register/industry"><span class="n">2</span> Register an industry</a></li>' : ''}
-            ${canManageEvents() ? '<li><a href="#/register/event"><span class="n">3</span> Add an event</a></li>' : ''}
-            ${canManageTaxonomy() ? '<li><a href="#/register/pattern"><span class="n">4</span> Define a pattern</a></li>' : ''}
+            ${canCreate('solutionPlay') ? '<li><a href="#/register/solutionplay"><span class="n">2</span> Register a solution play</a></li>' : ''}
+            ${canCreate('pattern') ? '<li><a href="#/register/pattern"><span class="n">3</span> Define a pattern / accelerator</a></li>' : ''}
+            ${canManageTaxonomy() ? '<li><a href="#/register/industry"><span class="n">4</span> Register an industry</a></li>' : ''}
+            ${canCreate('vertical') ? '<li><a href="#/register/vertical"><span class="n">5</span> Register a vertical</a></li>' : ''}
+            ${canManageEvents() ? '<li><a href="#/register/event"><span class="n">6</span> Add an event</a></li>' : ''}
+            ${canApprove() && pendingCount() ? `<li><a href="#/approvals"><span class="n">!</span> Review ${pendingCount()} pending approval${pendingCount() === 1 ? '' : 's'}</a></li>` : ''}
             ${isViewer() ? '<li class="dim tiny" style="padding:8px 2px">You have read-only access. Browse the catalog using the menu above.</li>' : ''}
           </ul>
         </div>
@@ -198,7 +261,7 @@ function pageHome() {
 function ucCard(uc) {
   const node = el(`<div class="card hover uc-card">
     <div class="uc-top"><h3>${esc(uc.title)}</h3>${statusBadge(uc.status)}</div>
-    <div class="uc-meta">${esc(industryName(uc.industryId))}${uc.segment ? ' · ' + esc(uc.segment) : ''}</div>
+    <div class="uc-meta">${esc(industryName(uc.industryId))}${uc.verticalId ? ' · ' + esc(verticalName(uc.verticalId)) : ''}</div>
     <div class="tag-row">${tagChips((uc.tags || []).slice(0, 4))}</div>
     <div class="tiny dim">${hasOwner(uc) ? '👤 ' + esc(ownerDisplay(uc)) : ''}</div>
   </div>`);
@@ -207,11 +270,11 @@ function ucCard(uc) {
 }
 
 // ---- Use cases browse -----------------------------------------------------
-const ucFilter = { industry: '', segment: '', solutionPlay: '', status: '', tag: '', search: '' };
+const ucFilter = { industry: '', vertical: '', solutionPlay: '', status: '', tag: '', search: '' };
 function filteredUseCases() {
   let list = activeUseCases();
   if (ucFilter.industry) list = list.filter(u => u.industryId === ucFilter.industry);
-  if (ucFilter.segment) list = list.filter(u => u.segment === ucFilter.segment);
+  if (ucFilter.vertical) list = list.filter(u => u.verticalId === ucFilter.vertical);
   if (ucFilter.solutionPlay) list = list.filter(u => u.solutionPlay === ucFilter.solutionPlay);
   if (ucFilter.status) list = list.filter(u => u.status === ucFilter.status);
   if (ucFilter.tag) list = list.filter(u => (u.tags || []).includes(ucFilter.tag));
@@ -224,15 +287,15 @@ function filteredUseCases() {
 }
 function pageUseCases() {
   const industryOpts = `<option value="">All</option>` +
-    db.industries.filter(i => i.recordStatus !== 'Archived').map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join('');
+    activeIndustries().map(i => `<option value="${esc(i.id)}">${esc(i.name)}</option>`).join('');
   const node = el(`<div>
     <div class="page-head spread"><div><h1>Use Cases</h1><p>Browse and filter the SLED Use Case</p></div>
       ${canCreate('useCase') ? '<a class="btn primary" href="#/register/usecase">+ Register a use case</a>' : ''}</div>
     <div class="filterbar">
       <div class="filter-fields">
         <label class="filter-field"><span>Industry</span><select class="select" id="fIndustry">${industryOpts}</select></label>
-        <label class="filter-field"><span>Segment</span><select class="select" id="fSegment"><option value="">All</option>${opts(SEGMENTS, '')}</select></label>
-        <label class="filter-field"><span>Solution Play</span><select class="select" id="fPlay"><option value="">All</option>${opts(SOLUTION_PLAYS, '')}</select></label>
+        <label class="filter-field"><span>Vertical</span><select class="select" id="fVertical"><option value="">All</option></select></label>
+        <label class="filter-field"><span>Solution Play</span><select class="select" id="fPlay"><option value="">All</option>${solutionPlayNames().map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('')}</select></label>
         <label class="filter-field"><span>Status</span><select class="select" id="fStatus"><option value="">All</option>${opts(STATUSES, '')}</select></label>
         <label class="filter-field"><span>Tags</span><select class="select" id="fTag"><option value="">All</option>${opts(TAGS, '')}</select></label>
         <label class="filter-field"><span>Search text</span><input id="ucSearch" placeholder="Search title, problem, solution…" value="${esc(ucFilter.search)}"></label>
@@ -248,22 +311,32 @@ function pageUseCases() {
     count.textContent = `COUNT: ${list.length}`;
   };
   const fIndustry = node.querySelector('#fIndustry');
-  const fSegment = node.querySelector('#fSegment');
+  const fVertical = node.querySelector('#fVertical');
   const fPlay = node.querySelector('#fPlay');
   const fStatus = node.querySelector('#fStatus');
   const fTag = node.querySelector('#fTag');
   const fSearch = node.querySelector('#ucSearch');
-  fIndustry.value = ucFilter.industry; fSegment.value = ucFilter.segment; fPlay.value = ucFilter.solutionPlay;
+  // (Re)build the Vertical options for the selected industry (or all industries).
+  const fillVerticals = () => {
+    const list = ucFilter.industry
+      ? verticalsForIndustry(ucFilter.industry)
+      : db.verticals.filter(v => v.recordStatus !== 'Archived' && isApproved(v)).sort((a, b) => a.name.localeCompare(b.name));
+    fVertical.innerHTML = `<option value="">All</option>` +
+      list.map(v => `<option value="${esc(v.id)}"${v.id === ucFilter.vertical ? ' selected' : ''}>${esc(v.name)}</option>`).join('');
+  };
+  fIndustry.value = ucFilter.industry; fPlay.value = ucFilter.solutionPlay;
   fStatus.value = ucFilter.status; fTag.value = ucFilter.tag;
-  fIndustry.addEventListener('change', e => { ucFilter.industry = e.target.value; render(); });
-  fSegment.addEventListener('change', e => { ucFilter.segment = e.target.value; render(); });
+  fillVerticals();
+  fIndustry.addEventListener('change', e => { ucFilter.industry = e.target.value; ucFilter.vertical = ''; fillVerticals(); render(); });
+  fVertical.addEventListener('change', e => { ucFilter.vertical = e.target.value; render(); });
   fPlay.addEventListener('change', e => { ucFilter.solutionPlay = e.target.value; render(); });
   fStatus.addEventListener('change', e => { ucFilter.status = e.target.value; render(); });
   fTag.addEventListener('change', e => { ucFilter.tag = e.target.value; render(); });
   fSearch.addEventListener('input', e => { ucFilter.search = e.target.value; render(); });
   node.querySelector('#fClear').addEventListener('click', () => {
-    Object.assign(ucFilter, { industry: '', segment: '', solutionPlay: '', status: '', tag: '', search: '' });
-    fIndustry.value = ''; fSegment.value = ''; fPlay.value = ''; fStatus.value = ''; fTag.value = ''; fSearch.value = '';
+    Object.assign(ucFilter, { industry: '', vertical: '', solutionPlay: '', status: '', tag: '', search: '' });
+    fIndustry.value = ''; fPlay.value = ''; fStatus.value = ''; fTag.value = ''; fSearch.value = '';
+    fillVerticals();
     render();
   });
   render();
@@ -281,9 +354,10 @@ function pageUseCase(id) {
     <div class="breadcrumb"><a href="#/usecases">Use Cases</a> / ${esc(uc.id)}</div>
     <div class="hero">
       <div class="spread"><h1>${esc(uc.title)}</h1>${statusBadge(uc.status)}</div>
+      ${isApproved(uc) ? '' : `<div class="tiny" style="margin:6px 0">${approvalBadge(uc)}${isRejected(uc) && uc.reviewNote ? ' <span class="dim">— ' + esc(uc.reviewNote) + '</span>' : ''}</div>`}
       <div class="hero-meta">
         <span>🏛 ${esc(industryName(uc.industryId))}</span>
-        ${uc.segment ? `<span>📍 ${esc(uc.segment)}</span>` : ''}
+        ${uc.verticalId ? `<span>📍 ${esc(verticalName(uc.verticalId))}</span>` : ''}
         ${uc.solutionPlay ? `<span>🎯 ${esc(uc.solutionPlay)}</span>` : ''}
       </div>
       <div class="tag-row">${tagChips(uc.tags)}</div>
@@ -301,7 +375,7 @@ function pageUseCase(id) {
     </div>
     <div data-panel="overview"><div class="card"><dl class="fields">
       ${field('Industry', esc(industryName(uc.industryId)))}
-      ${field('Segment', esc(uc.segment))}
+      ${field('Vertical', esc(verticalName(uc.verticalId)))}
       ${field('Owner', hasOwner(uc) ? esc(ownerDisplay(uc)) : '<span class="dim">—</span>')}
       ${field('Business problem', esc(uc.businessProblem))}
       ${field('Current process', esc(uc.currentProcess))}
@@ -504,21 +578,25 @@ function renderDocTiles(listEl, docs, { onRemove, refresh, readOnly = false }) {
 function pageIndustries() {
   const counts = industryCounts();
   const manage = canManageTaxonomy();
-  const list = db.industries.filter(i => i.recordStatus !== 'Archived').sort((a, b) => a.name.localeCompare(b.name));
+  const canVert = canCreate('vertical');
+  const list = db.industries.filter(i => i.recordStatus !== 'Archived' && isApproved(i)).sort((a, b) => a.name.localeCompare(b.name));
   const node = el(`<div>
-    <div class="page-head spread"><div><h1>Industries</h1><p>The SLED verticals</p></div>
-      ${manage ? '<a class="btn primary" href="#/register/industry">+ Register an industry</a>' : ''}</div>
+    <div class="page-head spread"><div><h1>Industries</h1><p>SLED industries and their verticals</p></div>
+      <div class="record-actions">
+        ${manage ? '<a class="btn primary" href="#/register/industry">+ Register an industry</a>' : ''}
+        ${canVert ? '<a class="btn" href="#/register/vertical">+ Add a vertical</a>' : ''}</div></div>
     <div class="grid cols-3" id="indGrid"></div></div>`);
   const grid = node.querySelector('#indGrid');
   if (!list.length) grid.appendChild(el('<span class="dim">No industries yet.</span>'));
   list.forEach(i => {
+    const verts = verticalsForIndustry(i.id);
     const c = el(`<div class="card hover">
       <div class="spread"><h3>${esc(i.name)}</h3><span class="status-pill">${counts[i.id] || 0} use case${(counts[i.id] || 0) === 1 ? '' : 's'}</span></div>
-      ${i.segment ? `<div class="uc-meta">${esc(i.segment)}</div>` : ''}
+      <div class="uc-meta">${verts.length} vertical${verts.length === 1 ? '' : 's'}${verts.length ? ' · ' + esc(verts.slice(0, 3).map(v => v.name).join(', ')) + (verts.length > 3 ? '…' : '') : ''}</div>
       <p class="tiny muted">${esc(i.description) || '<span class="dim">No description.</span>'}</p>
       <div class="record-actions" style="margin-top:6px">
         ${manage ? '<button class="btn tiny" data-edit>Edit</button>' : ''}
-        <button class="btn tiny ghost" data-open>View use cases</button>
+        <button class="btn tiny ghost" data-open>Open</button>
       </div></div>`);
     if (manage) c.querySelector('[data-edit]').addEventListener('click', () => openEditIndustry(i.id));
     c.querySelector('[data-open]').addEventListener('click', () => { location.hash = `#/industry/${i.id}`; });
@@ -530,21 +608,61 @@ function pageIndustry(id) {
   const ind = db.byId[id];
   if (!ind) return notFound('Industry');
   const manage = canManageTaxonomy();
+  const canVert = canCreate('vertical');
   const ucs = useCasesForIndustry(id);
+  const verts = verticalsForIndustry(id);
   const node = el(`<div>
     <div class="breadcrumb"><a href="#/industries">Industries</a> / ${esc(ind.name)}</div>
-    <div class="hero"><h1>${esc(ind.name)}</h1>
-      ${ind.segment ? `<div class="hero-meta"><span>📍 ${esc(ind.segment)}</span></div>` : ''}
+    <div class="hero"><div class="spread"><h1>${esc(ind.name)}</h1>${approvalBadge(ind)}</div>
       <p class="muted">${esc(ind.description)}</p>
       <div class="record-actions">${manage ? '<button class="btn" data-edit>Edit</button>' : ''}
+        ${canVert ? `<a class="btn ghost" href="#/register/vertical/${esc(ind.id)}">+ Add a vertical</a>` : ''}
         <button class="btn ghost" data-audit>History</button></div></div>
-    <h2 class="sec-h">Use cases in this industry (${ucs.length})</h2>
+    <h2 class="sec-h">Verticals (${verts.length})</h2>
+    <div class="grid cols-3" id="indVerts"></div>
+    <h2 class="sec-h" style="margin-top:22px">Use cases in this industry (${ucs.length})</h2>
     <div class="grid cols-3" id="indUc"></div></div>`);
+  const vg = node.querySelector('#indVerts');
+  if (verts.length) verts.forEach(v => {
+    const editable = canEdit('vertical', v);
+    const vc = el(`<div class="card tiny"><div class="spread"><strong>${esc(v.name)}</strong>
+      <span class="status-pill">${useCasesForVertical(v.id).length}</span></div>
+      <p class="dim">${esc(v.description) || ''}</p>
+      ${editable ? '<div class="record-actions"><button class="btn tiny" data-vedit>Edit</button></div>' : ''}</div>`);
+    if (editable) vc.querySelector('[data-vedit]').addEventListener('click', () => openEditVertical(v.id));
+    vg.appendChild(vc);
+  });
+  else vg.appendChild(el('<span class="dim">No verticals yet.</span>'));
   const g = node.querySelector('#indUc');
   if (ucs.length) ucs.forEach(uc => g.appendChild(ucCard(uc)));
   else g.appendChild(el('<span class="dim">No use cases mapped yet.</span>'));
   if (manage) node.querySelector('[data-edit]').addEventListener('click', () => openEditIndustry(ind.id));
   node.querySelector('[data-audit]').addEventListener('click', () => openAuditModal(ind.id));
+  return node;
+}
+
+// ---- Solution Plays (browse) ----------------------------------------------
+function pageSolutionPlays() {
+  const canReg = canCreate('solutionPlay');
+  const list = activeSolutionPlays().sort((a, b) => a.name.localeCompare(b.name));
+  const counts = {};
+  for (const u of activeUseCases()) if (u.solutionPlay) counts[u.solutionPlay] = (counts[u.solutionPlay] || 0) + 1;
+  const node = el(`<div>
+    <div class="page-head spread"><div><h1>Solution Plays</h1><p>Microsoft solution plays used across use cases and patterns.</p></div>
+      ${canReg ? '<a class="btn primary" href="#/register/solutionplay">+ Register a solution play</a>' : ''}</div>
+    <div class="grid cols-3" id="spGrid"></div></div>`);
+  const grid = node.querySelector('#spGrid');
+  if (!list.length) grid.appendChild(el('<span class="dim">No solution plays yet.</span>'));
+  list.forEach(s => {
+    const c = counts[s.name] || 0;
+    const editable = canEdit('solutionPlay', s);
+    const card = el(`<div class="card hover">
+      <div class="spread"><h3>${esc(s.name)}</h3><span class="status-pill">${c} use case${c === 1 ? '' : 's'}</span></div>
+      <p class="tiny muted">${esc(s.description) || '<span class="dim">No description.</span>'}</p>
+      ${editable ? '<div class="record-actions" style="margin-top:6px"><button class="btn tiny" data-edit>Edit</button></div>' : ''}</div>`);
+    if (editable) card.querySelector('[data-edit]').addEventListener('click', () => openEditSolutionPlay(s.id));
+    grid.appendChild(card);
+  });
   return node;
 }
 
@@ -588,10 +706,10 @@ function pageEvents() {
 
 // ---- Patterns -------------------------------------------------------------
 function pagePatterns() {
-  const list = db.patterns.filter(p => p.recordStatus !== 'Archived').sort((a, b) => a.name.localeCompare(b.name));
+  const list = activePatterns().sort((a, b) => a.name.localeCompare(b.name));
   const node = el(`<div>
     <div class="page-head spread"><div><h1>Patterns</h1><p>Reusable solution patterns and accelerators.</p></div>
-      ${canManageTaxonomy() ? '<a class="btn primary" href="#/register/pattern">+ Define a pattern</a>' : ''}</div>
+      ${canCreate('pattern') ? '<a class="btn primary" href="#/register/pattern">+ Define a pattern</a>' : ''}</div>
     <div class="grid cols-3" id="patGrid"></div></div>`);
   const grid = node.querySelector('#patGrid');
   if (!list.length) grid.appendChild(el('<span class="dim">No patterns yet.</span>'));
@@ -612,12 +730,13 @@ function pagePatterns() {
 function pagePattern(id) {
   const p = db.byId[id];
   if (!p) return notFound('Pattern');
-  const editable = canManageTaxonomy();
+  const editable = canEdit('pattern', p);
   const ucs = useCasesForPattern(id);
   const accs = acceleratorsForPattern(id);
   const node = el(`<div>
     <div class="breadcrumb"><a href="#/patterns">Patterns</a> / ${esc(p.name)}</div>
     <div class="hero"><div class="spread"><h1>${esc(p.name)}</h1><span class="chip ${p.repeatability === 'High' ? 'good' : ''}">${esc(p.repeatability)} repeatability</span></div>
+      ${isApproved(p) ? '' : `<div class="tiny" style="margin:6px 0">${approvalBadge(p)}${isRejected(p) && p.reviewNote ? ' <span class="dim">— ' + esc(p.reviewNote) + '</span>' : ''}</div>`}
       <p class="muted">${esc(p.summary)}</p>
       ${p.solutionPlay ? `<div class="hero-meta"><span>🎯 ${esc(p.solutionPlay)}</span></div>` : ''}
       <div class="tag-row">${tagChips(p.components)}</div>
@@ -643,7 +762,7 @@ function pagePattern(id) {
 
 // ---- Audit ----------------------------------------------------------------
 function pageAudit() {
-  const archived = ['industries', 'useCases', 'events', 'patterns']
+  const archived = ['industries', 'verticals', 'solutionPlays', 'useCases', 'events', 'patterns', 'accelerators']
     .flatMap(k => db[k].filter(r => r.recordStatus === 'Archived').map(r => ({ r, type: k })));
   const log = db.audit.slice().sort((a, b) => (a.at < b.at ? 1 : -1));
   const node = el(`<div>
@@ -663,7 +782,7 @@ function pageAudit() {
     tr.querySelector('[data-restore]').addEventListener('click', () => { restoreRecord(r, 'Record'); persistSoon(); route(); });
     tr.querySelector('[data-del]').addEventListener('click', () => {
       if (!confirm('Permanently delete this record? This cannot be undone.')) return;
-      const map = { industries: 'industries', useCases: 'useCases', events: 'events', patterns: 'patterns' };
+      const map = { industries: 'industries', verticals: 'verticals', solutionPlays: 'solutionPlays', useCases: 'useCases', events: 'events', patterns: 'patterns', accelerators: 'accelerators' };
       const coll = db[map[type]]; const i = coll.indexOf(r); if (i >= 0) coll.splice(i, 1);
       logAudit(r, 'Record', 'Deleted', 'Permanently deleted.'); reindex(); persistSoon(); route();
     });
@@ -718,9 +837,11 @@ function permDenied(action) {
 function pageRegister() {
   const steps = [
     ['1', 'Register a use case', 'Capture a SLED use case mapped to an industry.', '#/register/usecase', canCreate('useCase')],
-    ['2', 'Register an industry', 'Add or adjust a SLED vertical.', '#/register/industry', canManageTaxonomy()],
-    ['3', 'Add an event', 'Track a SLED event (standalone).', '#/register/event', canManageEvents()],
-    ['4', 'Reusable pattern / Solution accelerator', 'Define a repeatable solution pattern.', '#/register/pattern', canManageTaxonomy()]
+    ['2', 'Register a solution play', 'Add or adjust a solution play (used by use cases & patterns).', '#/register/solutionplay', canCreate('solutionPlay')],
+    ['3', 'Reusable pattern / Solution accelerator', 'Define a repeatable pattern, then link accelerators.', '#/register/pattern', canCreate('pattern')],
+    ['4', 'Register an industry', 'Add or adjust a SLED industry.', '#/register/industry', canManageTaxonomy()],
+    ['5', 'Register a vertical', 'Add a vertical under an industry.', '#/register/vertical', canCreate('vertical')],
+    ['6', 'Add an event', 'Track a SLED event (standalone).', '#/register/event', canManageEvents()]
   ].filter(s => s[4]);
   if (!steps.length) return permDenied('add content to the library');
   const node = el(`<div><div class="page-head"><h1>Register &amp; Capture</h1><p>Add content to the library.</p></div>
@@ -737,9 +858,9 @@ function useCaseFields(uc) {
   <div class="form-grid">
     <div class="form-field full"><label>Use case title <span class="req">*</span></label><input name="title" value="${esc(uc.title)}" required></div>
     <div class="form-field"><label>Industry <span class="req">*</span></label><select name="industryId" required>${industryOptions(uc.industryId)}</select></div>
-    <div class="form-field"><label>Segment</label><select name="segment"><option value="">— Select —</option>${opts(SEGMENTS, uc.segment)}</select></div>
+    <div class="form-field"><label>Vertical</label><select name="verticalId">${verticalOptions(uc.industryId, uc.verticalId)}</select></div>
     <div class="form-field"><label>Status</label><select name="status">${opts(STATUSES, uc.status || 'Draft')}</select></div>
-    <div class="form-field"><label>Solution play</label><select name="solutionPlay"><option value="">— Select —</option>${opts(SOLUTION_PLAYS, uc.solutionPlay)}</select></div>
+    <div class="form-field"><label>Solution play</label><select name="solutionPlay">${solutionPlaySelect(uc.solutionPlay)}</select></div>
 
     <div class="form-section full"><span class="form-section-title">Overview</span></div>
     <div class="form-field full"><label>Business problem <span class="req">*</span></label><textarea name="businessProblem" required>${esc(uc.businessProblem)}</textarea></div>
@@ -773,7 +894,7 @@ function useCaseFields(uc) {
 function readUseCase(form, base) {
   return {
     ...base,
-    title: val(form, 'title'), industryId: val(form, 'industryId'), segment: val(form, 'segment'),
+    title: val(form, 'title'), industryId: val(form, 'industryId'), verticalId: val(form, 'verticalId') || null,
     status: val(form, 'status'), solutionPlay: val(form, 'solutionPlay'),
     businessProblem: val(form, 'businessProblem'), currentProcess: val(form, 'currentProcess'),
     proposedSolution: val(form, 'proposedSolution'), beneficiaries: val(form, 'beneficiaries'),
@@ -796,13 +917,17 @@ function pageRegisterUseCase() {
       <div class="modal-actions"><a class="btn ghost" href="#/usecases">Cancel</a><button class="btn primary" type="submit">Create use case</button></div></form></div>`);
   const form = node.querySelector('#ucForm');
   const staged = wireDocsStaged(form.querySelector('[data-docs]'));
+  wireIndustryVertical(form, draft.verticalId);
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!val(form, 'industryId')) { toast('Please select an industry.'); return; }
     const uc = buildUseCase(readUseCase(form, {}));
-    stampCreate(uc, 'Use case'); db.useCases.push(uc); reindex(); persistSoon();
+    stampCreate(uc, 'Use case');
+    const state = applyApproval(uc, 'Use case', { isNew: true });
+    db.useCases.push(uc); reindex(); persistSoon();
     await flushStagedDocs(uc.id, staged.files);
-    toast(`Use case created. ${savedNote()}`); location.hash = `#/usecase/${uc.id}`;
+    toast(submitToast(state, 'Use case created.'));
+    location.hash = state === 'Pending' ? '#/usecases' : `#/usecase/${uc.id}`;
   });
   return node;
 }
@@ -811,10 +936,14 @@ function openEditUseCase(id) {
   const overlay = openModal('Edit use case', `<form class="modal-form" id="ucEdit">${useCaseFields(uc)}
     <div class="modal-actions"><button class="btn" type="button" data-cancel>Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`, true);
   const form = overlay.querySelector('#ucEdit');
+  wireIndustryVertical(form, uc.verticalId);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     Object.assign(uc, buildUseCase(readUseCase(form, uc)));
-    stampEdit(uc, 'Use case'); reindex(); persistSoon(); overlay.remove(); toast(`Saved. ${savedNote()}`); route();
+    stampEdit(uc, 'Use case');
+    const state = applyApproval(uc, 'Use case', { isNew: false });
+    reindex(); persistSoon(); overlay.remove();
+    toast(submitToast(state, 'Saved.')); route();
   });
 }
 
@@ -822,16 +951,14 @@ function openEditUseCase(id) {
 function industryFields(i) {
   return `<div class="form-grid">
     <div class="form-field full"><label>Industry name <span class="req">*</span></label>
-      <input name="name" list="vertList" value="${esc(i.name)}" required placeholder="Pick a SLED vertical or type one">
-      <datalist id="vertList">${VERTICALS.map(v => `<option value="${esc(v)}">`).join('')}</datalist></div>
-    <div class="form-field full"><label>Segment</label><select name="segment"><option value="">— Select —</option>${opts(SEGMENTS, i.segment)}</select></div>
+      <input name="name" value="${esc(i.name)}" required placeholder="e.g. State &amp; Local Government"></div>
     <div class="form-field full"><label>Description</label><textarea name="description">${esc(i.description)}</textarea></div>
   </div>`;
 }
-const readIndustry = (form, base) => ({ ...base, name: val(form, 'name'), segment: val(form, 'segment'), description: val(form, 'description') });
+const readIndustry = (form, base) => ({ ...base, name: val(form, 'name'), description: val(form, 'description') });
 function pageRegisterIndustry() {
   if (!canManageTaxonomy()) return permDenied('register industries');
-  const node = el(`<div><div class="page-head"><h1>Register an industry</h1><p>Add or adjust a SLED vertical. ${esc(savedNote())}</p></div>
+  const node = el(`<div><div class="page-head"><h1>Register an industry</h1><p>Add or adjust a SLED industry. Verticals are added separately. ${esc(savedNote())}</p></div>
     <form class="card" id="indForm" style="max-width:680px">${industryFields(buildIndustry({}))}
       <div class="modal-actions"><a class="btn ghost" href="#/industries">Cancel</a><button class="btn primary" type="submit">Create industry</button></div></form>
     <h2 class="sec-h" style="margin-top:26px">Existing industries</h2><div class="grid cols-3" id="indList"></div></div>`);
@@ -840,12 +967,14 @@ function pageRegisterIndustry() {
     e.preventDefault();
     if (!val(form, 'name')) { toast('Name is required.'); return; }
     const ind = buildIndustry(readIndustry(form, {}));
-    stampCreate(ind, 'Industry'); db.industries.push(ind); reindex(); persistSoon();
-    toast(`Industry created. ${savedNote()}`); location.hash = '#/industries';
+    stampCreate(ind, 'Industry');
+    const state = applyApproval(ind, 'Industry', { isNew: true });
+    db.industries.push(ind); reindex(); persistSoon();
+    toast(submitToast(state, 'Industry created.')); location.hash = '#/industries';
   });
   const listBox = node.querySelector('#indList');
   db.industries.filter(i => i.recordStatus !== 'Archived').forEach(i =>
-    listBox.appendChild(el(`<div class="card tiny"><strong>${esc(i.name)}</strong>${i.segment ? '<br>' + esc(i.segment) : ''}</div>`)));
+    listBox.appendChild(el(`<div class="card tiny"><strong>${esc(i.name)}</strong> ${approvalBadge(i)}<br><span class="dim">${verticalsForIndustry(i.id).length} vertical${verticalsForIndustry(i.id).length === 1 ? '' : 's'}</span></div>`)));
   return node;
 }
 function openEditIndustry(id) {
@@ -855,7 +984,113 @@ function openEditIndustry(id) {
   overlay.querySelector('#indEdit').addEventListener('submit', (e) => {
     e.preventDefault();
     Object.assign(ind, buildIndustry(readIndustry(overlay.querySelector('#indEdit'), ind)));
-    stampEdit(ind, 'Industry'); reindex(); persistSoon(); overlay.remove(); toast(`Saved. ${savedNote()}`); route();
+    stampEdit(ind, 'Industry');
+    const state = applyApproval(ind, 'Industry', { isNew: false });
+    reindex(); persistSoon(); overlay.remove(); toast(submitToast(state, 'Saved.')); route();
+  });
+}
+
+// ---- Vertical form (child of an Industry) ---------------------------------
+function verticalFields(v, lockIndustry) {
+  const indSelect = lockIndustry
+    ? `<input type="hidden" name="industryId" value="${esc(v.industryId || '')}"><div class="dim tiny">${esc(industryName(v.industryId))}</div>`
+    : `<select name="industryId" required>${industryOptions(v.industryId)}</select>`;
+  return `<div class="form-grid">
+    <div class="form-field full"><label>Industry <span class="req">*</span></label>${indSelect}</div>
+    <div class="form-field full"><label>Vertical name <span class="req">*</span></label>
+      <input name="name" value="${esc(v.name)}" required placeholder="e.g. Higher Education"></div>
+    <div class="form-field full"><label>Description</label><textarea name="description">${esc(v.description)}</textarea></div>
+  </div>`;
+}
+const readVertical = (form, base) => ({
+  ...base, name: val(form, 'name'), industryId: val(form, 'industryId') || null, description: val(form, 'description')
+});
+function pageRegisterVertical(preIndustryId) {
+  if (!canCreate('vertical')) return permDenied('register verticals');
+  const draft = buildVertical(preIndustryId ? { industryId: preIndustryId } : {});
+  const node = el(`<div><div class="page-head"><h1>Register a vertical</h1><p>Add a vertical under an industry. ${esc(savedNote())}</p></div>
+    <form class="card" id="verForm" style="max-width:680px">${verticalFields(draft)}
+      <div class="modal-actions"><a class="btn ghost" href="#/industries">Cancel</a><button class="btn primary" type="submit">Create vertical</button></div></form>
+    <h2 class="sec-h" style="margin-top:26px">Existing verticals</h2><div class="grid cols-3" id="verList"></div></div>`);
+  const form = node.querySelector('#verForm');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!val(form, 'name')) { toast('Name is required.'); return; }
+    if (!val(form, 'industryId')) { toast('Please select an industry.'); return; }
+    const v = buildVertical(readVertical(form, {}));
+    stampCreate(v, 'Vertical');
+    const state = applyApproval(v, 'Vertical', { isNew: true });
+    db.verticals.push(v); reindex(); persistSoon();
+    toast(submitToast(state, 'Vertical created.')); location.hash = `#/industry/${v.industryId}`;
+  });
+  const listBox = node.querySelector('#verList');
+  const vs = db.verticals.filter(v => v.recordStatus !== 'Archived').sort((a, b) => a.name.localeCompare(b.name));
+  if (!vs.length) listBox.appendChild(el('<span class="dim">No verticals yet.</span>'));
+  vs.forEach(v => listBox.appendChild(el(
+    `<div class="card tiny"><strong>${esc(v.name)}</strong> ${approvalBadge(v)}<br><span class="dim">${esc(industryName(v.industryId))}</span></div>`)));
+  return node;
+}
+function openEditVertical(id) {
+  const v = db.byId[id];
+  const overlay = openModal('Edit vertical', `<form class="modal-form" id="verEdit">${verticalFields(v)}
+    <div class="modal-actions"><button class="btn" type="button" data-cancel>Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
+  overlay.querySelector('#verEdit').addEventListener('submit', (e) => {
+    e.preventDefault();
+    Object.assign(v, buildVertical(readVertical(overlay.querySelector('#verEdit'), v)));
+    stampEdit(v, 'Vertical');
+    const state = applyApproval(v, 'Vertical', { isNew: false });
+    reindex(); persistSoon(); overlay.remove(); toast(submitToast(state, 'Saved.')); route();
+  });
+}
+
+// ---- Solution Play form (data-driven choice) ------------------------------
+function solutionPlayFields(s) {
+  return `<div class="form-grid">
+    <div class="form-field full"><label>Solution play name <span class="req">*</span></label>
+      <input name="name" value="${esc(s.name)}" required placeholder="e.g. Modernize Government Operations"></div>
+    <div class="form-field full"><label>Description</label><textarea name="description">${esc(s.description)}</textarea></div>
+  </div>`;
+}
+const readSolutionPlay = (form, base) => ({ ...base, name: val(form, 'name'), description: val(form, 'description') });
+function pageRegisterSolutionPlay() {
+  if (!canCreate('solutionPlay')) return permDenied('register solution plays');
+  const node = el(`<div><div class="page-head"><h1>Register a solution play</h1><p>Add or adjust a Microsoft solution play. Used by use cases and patterns. ${esc(savedNote())}</p></div>
+    <form class="card" id="spForm" style="max-width:680px">${solutionPlayFields(buildSolutionPlay({}))}
+      <div class="modal-actions"><a class="btn ghost" href="#/patterns">Cancel</a><button class="btn primary" type="submit">Create solution play</button></div></form>
+    <h2 class="sec-h" style="margin-top:26px">Existing solution plays</h2><div class="grid cols-3" id="spList"></div></div>`);
+  const form = node.querySelector('#spForm');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!val(form, 'name')) { toast('Name is required.'); return; }
+    const s = buildSolutionPlay(readSolutionPlay(form, {}));
+    stampCreate(s, 'Solution play');
+    const state = applyApproval(s, 'Solution play', { isNew: true });
+    db.solutionPlays.push(s); reindex(); persistSoon();
+    toast(submitToast(state, 'Solution play created.')); location.hash = '#/register/solutionplay';
+  });
+  const listBox = node.querySelector('#spList');
+  const sps = db.solutionPlays.filter(s => s.recordStatus !== 'Archived').sort((a, b) => a.name.localeCompare(b.name));
+  if (!sps.length) listBox.appendChild(el('<span class="dim">No solution plays yet.</span>'));
+  sps.forEach(s => {
+    const editable = canEdit('solutionPlay', s);
+    const c = el(`<div class="card tiny"><div class="spread"><strong>${esc(s.name)}</strong> ${approvalBadge(s)}</div>
+      <p class="dim">${esc(s.description) || ''}</p>
+      ${editable ? '<div class="record-actions"><button class="btn tiny" data-edit>Edit</button></div>' : ''}</div>`);
+    if (editable) c.querySelector('[data-edit]').addEventListener('click', () => openEditSolutionPlay(s.id));
+    listBox.appendChild(c);
+  });
+  return node;
+}
+function openEditSolutionPlay(id) {
+  const s = db.byId[id];
+  const overlay = openModal('Edit solution play', `<form class="modal-form" id="spEdit">${solutionPlayFields(s)}
+    <div class="modal-actions"><button class="btn" type="button" data-cancel>Cancel</button><button class="btn primary" type="submit">Save</button></div></form>`);
+  overlay.querySelector('#spEdit').addEventListener('submit', (e) => {
+    e.preventDefault();
+    Object.assign(s, buildSolutionPlay(readSolutionPlay(overlay.querySelector('#spEdit'), s)));
+    stampEdit(s, 'Solution play');
+    const state = applyApproval(s, 'Solution play', { isNew: false });
+    reindex(); persistSoon(); overlay.remove(); toast(submitToast(state, 'Saved.')); route();
   });
 }
 
@@ -911,7 +1146,7 @@ function patternFields(p) {
   return `<div class="form-grid">
     <div class="form-field full"><label>Pattern name <span class="req">*</span></label><input name="name" value="${esc(p.name)}" required></div>
     <div class="form-field"><label>Repeatability</label><select name="repeatability">${opts(REPEATABILITY, p.repeatability)}</select></div>
-    <div class="form-field"><label>Solution play</label><select name="solutionPlay"><option value="">— Select —</option>${opts(SOLUTION_PLAYS, p.solutionPlay)}</select></div>
+    <div class="form-field"><label>Solution play</label><select name="solutionPlay">${solutionPlaySelect(p.solutionPlay)}</select></div>
     <div class="form-field full"><label>Summary <span class="req">*</span></label><textarea name="summary" required>${esc(p.summary)}</textarea></div>
     <div class="form-field full"><label>Components <span class="hint">(comma-separated)</span></label><input name="components" value="${esc(csv(p.components))}"></div>
   </div>`;
@@ -921,18 +1156,21 @@ const readPattern = (form, base) => ({
   solutionPlay: val(form, 'solutionPlay'), summary: val(form, 'summary'), components: val(form, 'components')
 });
 function pageRegisterPattern() {
-  if (!canManageTaxonomy()) return permDenied('manage patterns');
-  const node = el(`<div><div class="page-head"><h1>Reusable pattern / Solution accelerator</h1><p>Define a repeatable solution pattern and link accelerators. ${esc(savedNote())}</p></div>
-    <div class="grid cols-2">
-      <form class="card" id="patForm"><h3>Define a pattern</h3>${patternFields(buildPattern({}))}
-        <div class="form-section">${solutionArchSection({ staged: true })}</div>
-        <div class="modal-actions"><button class="btn primary" type="submit">Create pattern</button></div></form>
+  if (!canCreate('pattern')) return permDenied('register patterns');
+  const canAcc = canCreate('accelerator');   // contributors + curators
+  const accForm = canAcc ? `
       <form class="card" id="accForm"><h3>Add an accelerator</h3><div class="form-grid">
         <div class="form-field full"><label>Accelerator name <span class="req">*</span></label><input name="name" required></div>
         <div class="form-field"><label>Type</label><select name="type">${opts(ACCELERATOR_TYPES, '')}</select></div>
         <div class="form-field"><label>Pattern <span class="req">*</span></label><select name="patternId" required>${patternOptions('')}</select></div>
         <div class="form-field full"><label>URL</label><input name="url"></div>
-      </div><div class="modal-actions"><button class="btn primary" type="submit">Add accelerator</button></div></form>
+      </div><div class="modal-actions"><button class="btn primary" type="submit">Add accelerator</button></div></form>` : '';
+  const node = el(`<div><div class="page-head"><h1>Reusable pattern / Solution accelerator</h1><p>Define a repeatable solution pattern${canAcc ? ' and link accelerators' : ''}. ${esc(savedNote())}</p></div>
+    <div class="grid ${canAcc ? 'cols-2' : ''}">
+      <form class="card" id="patForm"><h3>Define a pattern</h3>${patternFields(buildPattern({}))}
+        <div class="form-section">${solutionArchSection({ staged: true })}</div>
+        <div class="modal-actions"><button class="btn primary" type="submit">Create pattern</button></div></form>
+      ${accForm}
     </div>
     <h2 class="sec-h" style="margin-top:24px">Pattern library</h2><div class="grid cols-3" id="patList"></div></div>`);
   const staged = wireDocsStaged(node.querySelector('#patForm [data-docs]'));
@@ -941,20 +1179,25 @@ function pageRegisterPattern() {
     const form = e.target;
     if (!val(form, 'name')) { toast('Name is required.'); return; }
     const p = buildPattern(readPattern(form, {}));
-    stampCreate(p, 'Pattern'); db.patterns.push(p); reindex(); persistSoon();
-    flushStagedDocs(p.id, staged.files).then(() => { toast(`Pattern created. ${savedNote()}`); route(); });
+    stampCreate(p, 'Pattern');
+    const state = applyApproval(p, 'Pattern', { isNew: true });
+    db.patterns.push(p); reindex(); persistSoon();
+    flushStagedDocs(p.id, staged.files).then(() => { toast(submitToast(state, 'Pattern created.')); route(); });
   });
-  node.querySelector('#accForm').addEventListener('submit', (e) => {
+  const accEl = node.querySelector('#accForm');
+  if (accEl) accEl.addEventListener('submit', (e) => {
     e.preventDefault();
     const form = e.target;
     if (!val(form, 'name') || !val(form, 'patternId')) { toast('Name and pattern are required.'); return; }
     const a = buildAccelerator({ name: val(form, 'name'), type: val(form, 'type'), patternId: val(form, 'patternId'), url: val(form, 'url') || '#' });
+    stampCreate(a, 'Accelerator');
+    const state = applyApproval(a, 'Accelerator', { isNew: true });
     db.accelerators.push(a);
     const p = db.byId[a.patternId]; if (p) { p.acceleratorIds = [...(p.acceleratorIds || []), a.id]; stampEdit(p, 'Pattern', 'Accelerator linked.'); }
-    reindex(); persistSoon(); toast(`Accelerator added. ${savedNote()}`); route();
+    reindex(); persistSoon(); toast(submitToast(state, 'Accelerator added.')); route();
   });
   const listBox = node.querySelector('#patList');
-  const pats = db.patterns.filter(p => p.recordStatus !== 'Archived');
+  const pats = activePatterns();
   if (!pats.length) listBox.appendChild(el('<span class="dim">No patterns yet.</span>'));
   pats.forEach(p => {
     const c = el(`<div class="card hover tiny"><strong>${esc(p.name)}</strong> <span class="chip ${p.repeatability === 'High' ? 'good' : ''}">${esc(p.repeatability)}</span>
@@ -971,16 +1214,65 @@ function openEditPattern(id) {
   overlay.querySelector('#patEdit').addEventListener('submit', (e) => {
     e.preventDefault();
     Object.assign(p, buildPattern({ ...readPattern(overlay.querySelector('#patEdit'), p), acceleratorIds: p.acceleratorIds }));
-    stampEdit(p, 'Pattern'); reindex(); persistSoon(); overlay.remove(); toast(`Saved. ${savedNote()}`); route();
+    stampEdit(p, 'Pattern');
+    const state = applyApproval(p, 'Pattern', { isNew: false });
+    reindex(); persistSoon(); overlay.remove(); toast(submitToast(state, 'Saved.')); route();
   });
+}
+
+// ---- Approvals (Owners/Approvers review Contributor submissions) ----------
+function pageApprovals() {
+  if (!canApprove()) return permDenied('review approvals');
+  const items = pendingItems();
+  const node = el(`<div>
+    <div class="page-head"><h1>Approvals</h1><p>Review content submitted by contributors. Approve to publish it to the catalog, or reject with a reason.</p></div>
+    <div id="apprList"></div></div>`);
+  const listBox = node.querySelector('#apprList');
+  if (!items.length) { listBox.appendChild(el('<div class="card"><span class="dim">Nothing awaiting approval. You’re all caught up.</span></div>')); return node; }
+  const detailHref = (type, rec) => type === 'Use case' ? `#/usecase/${rec.id}`
+    : type === 'Industry' ? `#/industry/${rec.id}`
+    : type === 'Pattern' ? `#/pattern/${rec.id}`
+    : type === 'Accelerator' ? `#/pattern/${rec.patternId}`
+    : type === 'Solution play' ? `#/register/solutionplay`
+    : `#/industry/${rec.industryId}`;
+  items.forEach(({ rec, type }) => {
+    const sub = `${esc(rec.submittedBy || rec.createdBy || '—')}${rec.submittedAt ? ' · ' + fmtDate(String(rec.submittedAt).slice(0, 10)) : ''}`;
+    const meta = type === 'Use case'
+      ? `${esc(industryName(rec.industryId))}${rec.verticalId ? ' · ' + esc(verticalName(rec.verticalId)) : ''}`
+      : type === 'Vertical' ? `${esc(industryName(rec.industryId))}`
+      : type === 'Pattern' ? `${esc(rec.repeatability || '')} repeatability`
+      : type === 'Accelerator' ? `${esc(rec.type || '')} · ${esc(patternName(rec.patternId))}`
+      : type === 'Solution play' ? 'Solution play'
+      : 'Industry';
+    const card = el(`<div class="card" style="margin-bottom:12px">
+      <div class="spread"><div><span class="chip info">${esc(type)}</span> <strong>${esc(rec.name || rec.title)}</strong>
+        <div class="tiny dim">${meta}</div></div>
+        <div class="tiny dim">Submitted by ${sub}</div></div>
+      <p class="tiny muted" style="margin:8px 0">${esc(rec.description || rec.businessProblem || '')}</p>
+      <div class="record-actions">
+        <a class="btn tiny ghost" href="${detailHref(type, rec)}">View</a>
+        <button class="btn tiny primary" data-approve>Approve</button>
+        <button class="btn tiny danger" data-reject>Reject</button>
+      </div></div>`);
+    card.querySelector('[data-approve]').addEventListener('click', () => {
+      approveRecord(rec, type); reindex(); persistSoon(); toast(`Approved. ${savedNote()}`); route();
+    });
+    card.querySelector('[data-reject]').addEventListener('click', () => {
+      const note = prompt('Reason for rejection (optional):', '');
+      if (note === null) return;
+      rejectRecord(rec, type, note.trim()); reindex(); persistSoon(); toast('Rejected.'); route();
+    });
+    listBox.appendChild(card);
+  });
+  return node;
 }
 
 // =====================================================================
 // ROUTER + CHROME
 // =====================================================================
 const ROUTES = {
-  home: pageHome, usecases: pageUseCases, industries: pageIndustries, events: pageEvents,
-  patterns: pagePatterns, audit: pageAudit, about: pageAbout,
+  home: pageHome, usecases: pageUseCases, industries: pageIndustries, solutionplays: pageSolutionPlays,
+  events: pageEvents, patterns: pagePatterns, audit: pageAudit, about: pageAbout, approvals: pageApprovals,
   register: pageRegister
 };
 function route() {
@@ -995,12 +1287,15 @@ function route() {
   else if (base === 'pattern') node = pagePattern(id);
   else if (base === 'register' && sub === 'usecase') node = pageRegisterUseCase();
   else if (base === 'register' && sub === 'industry') node = pageRegisterIndustry();
+  else if (base === 'register' && sub === 'vertical') node = pageRegisterVertical(parts[2] || '');
+  else if (base === 'register' && sub === 'solutionplay') node = pageRegisterSolutionPlay();
   else if (base === 'register' && sub === 'event') node = pageRegisterEvent();
   else if (base === 'register' && sub === 'pattern') node = pageRegisterPattern();
   else node = (ROUTES[base] || pageHome)();
   mount(node);
   document.querySelectorAll('#mainnav a[data-route]').forEach(a =>
     a.classList.toggle('active', a.dataset.route === base || (base === 'register' && false)));
+  applyChrome();
   closeRegisterMenu();
 }
 
@@ -1013,15 +1308,28 @@ function wireChrome() {
   document.addEventListener('click', (e) => { if (menu && !menu.contains(e.target)) menu.classList.remove('open'); });
 }
 
-// Show/hide the Register menu items to match the signed-in user's role.
+// Show/hide the Register menu items + Approvals tab to match the user's role.
 function applyChrome() {
+  // Approvals nav tab: only Owners/Approvers, with a live pending count badge.
+  const approvals = document.querySelector('#mainnav a[data-route="approvals"]');
+  if (approvals) {
+    if (canApprove()) {
+      const n = pendingCount();
+      approvals.style.display = '';
+      approvals.textContent = n ? `Approvals (${n})` : 'Approvals';
+    } else {
+      approvals.style.display = 'none';
+    }
+  }
   const menu = document.getElementById('registerMenu');
   if (!menu) return;
   const allowed = {
     '#/register/usecase': canCreate('useCase'),
+    '#/register/solutionplay': canCreate('solutionPlay'),
+    '#/register/pattern': canCreate('pattern'),
     '#/register/industry': canManageTaxonomy(),
-    '#/register/event': canManageEvents(),
-    '#/register/pattern': canManageTaxonomy()
+    '#/register/vertical': canCreate('vertical'),
+    '#/register/event': canManageEvents()
   };
   let any = false;
   menu.querySelectorAll('.nav-dd-panel a').forEach(a => {

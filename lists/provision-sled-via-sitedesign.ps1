@@ -65,16 +65,31 @@ if (-not $AdminUrl) {
 #      t = Text (single line), n = Note (multi-line). Title exists by default.
 $LISTS = [ordered]@{
   'SLEDIndustries' = @{
-    t = @('IndustryId','Segment','RecordStatus','CreatedByName','CreatedAtText','ModifiedByName','ModifiedAtText')
-    n = @('Description')
+    t = @('IndustryId','RecordStatus',
+          'ApprovalStatus','SubmittedByName','SubmittedAtText','ReviewedByName','ReviewedAtText',
+          'CreatedByName','CreatedAtText','ModifiedByName','ModifiedAtText')
+    n = @('Description','ReviewNote')
+  }
+  'SLEDVerticals' = @{
+    t = @('VerticalId','IndustryId','RecordStatus',
+          'ApprovalStatus','SubmittedByName','SubmittedAtText','ReviewedByName','ReviewedAtText',
+          'CreatedByName','CreatedAtText','ModifiedByName','ModifiedAtText')
+    n = @('Description','ReviewNote')
+  }
+  'SLEDSolutionPlays' = @{
+    t = @('SolutionPlayId','RecordStatus',
+          'ApprovalStatus','SubmittedByName','SubmittedAtText','ReviewedByName','ReviewedAtText',
+          'CreatedByName','CreatedAtText','ModifiedByName','ModifiedAtText')
+    n = @('Description','ReviewNote')
   }
   'SLEDUseCases' = @{
-    t = @('UseCaseId','IndustryId','Segment','UCStatus','CopilotRole','SolutionPlay','PatternId',
+    t = @('UseCaseId','IndustryId','VerticalId','UCStatus','CopilotRole','SolutionPlay','PatternId',
           'EstimatedImpact','ImpactMetric','OwnerName','OwnerEmail','ReferenceUrl','RepoUrl',
-          'RecordStatus','CreatedByName','CreatedAtText','ModifiedByName','ModifiedAtText')
+          'RecordStatus','ApprovalStatus','SubmittedByName','SubmittedAtText','ReviewedByName','ReviewedAtText',
+          'CreatedByName','CreatedAtText','ModifiedByName','ModifiedAtText')
     n = @('BusinessProblem','CurrentProcess','ChallengeSummary','ProposedSolution','Beneficiaries',
           'Tags','Components','Services','DataDependencies','Compliance','Risks','BusinessValue',
-          'Feasibility','Reusability')
+          'Feasibility','Reusability','ReviewNote')
   }
   'SLEDEvents' = @{
     t = @('EventId','StartDate','EndDate','EventStatus','Format','Location','RegistrationUrl',
@@ -83,12 +98,15 @@ $LISTS = [ordered]@{
   }
   'SLEDPatterns' = @{
     t = @('PatternId','Repeatability','SolutionPlay','RecordStatus',
+          'ApprovalStatus','SubmittedByName','SubmittedAtText','ReviewedByName','ReviewedAtText',
           'CreatedByName','CreatedAtText','ModifiedByName','ModifiedAtText')
-    n = @('Summary','Components','AcceleratorIds')
+    n = @('Summary','Components','AcceleratorIds','ReviewNote')
   }
   'SLEDAccelerators' = @{
-    t = @('AcceleratorId','AccType','PatternId','Url')
-    n = @()
+    t = @('AcceleratorId','AccType','PatternId','Url','RecordStatus',
+          'ApprovalStatus','SubmittedByName','SubmittedAtText','ReviewedByName','ReviewedAtText',
+          'CreatedByName','CreatedAtText','ModifiedByName','ModifiedAtText')
+    n = @('ReviewNote')
   }
   'SLEDAuditLog' = @{
     t = @('AuditId','RecordId','RecordType','Action','ByName','AtText')
@@ -98,7 +116,7 @@ $LISTS = [ordered]@{
 
 # Business-key column per list (added to the default view so lists are readable).
 $KEY = @{
-  SLEDIndustries='IndustryId'; SLEDUseCases='UseCaseId'; SLEDEvents='EventId';
+  SLEDIndustries='IndustryId'; SLEDVerticals='VerticalId'; SLEDSolutionPlays='SolutionPlayId'; SLEDUseCases='UseCaseId'; SLEDEvents='EventId';
   SLEDPatterns='PatternId'; SLEDAccelerators='AcceleratorId'; SLEDAuditLog='AuditId'
 }
 
@@ -170,7 +188,14 @@ function New-LibraryScriptJson {
 if (-not (Get-Module -ListAvailable -Name Microsoft.Online.SharePoint.PowerShell)) {
   throw "Microsoft.Online.SharePoint.PowerShell is not installed. Run: Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser -Force"
 }
-Import-Module Microsoft.Online.SharePoint.PowerShell -UseWindowsPowerShell -WarningAction SilentlyContinue
+# -UseWindowsPowerShell only exists in PowerShell 7 (imports the Windows-only SPO
+# module via the compatibility layer). In Windows PowerShell 5.1 the module loads
+# natively, so import it without that switch there.
+if ($PSVersionTable.PSEdition -eq 'Core') {
+  Import-Module Microsoft.Online.SharePoint.PowerShell -UseWindowsPowerShell -WarningAction SilentlyContinue
+} else {
+  Import-Module Microsoft.Online.SharePoint.PowerShell -WarningAction SilentlyContinue
+}
 
 Write-Host "Connecting to $AdminUrl ..." -ForegroundColor Cyan
 Connect-SPOService -Url $AdminUrl

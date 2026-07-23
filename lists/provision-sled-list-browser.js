@@ -1,8 +1,8 @@
 /* ===========================================================================
  * provision-sled-list-browser.js
  * ---------------------------------------------------------------------------
- * Creates the SIX SharePoint lists that back the SLED Use Case Library app:
- *   SLEDIndustries, SLEDUseCases, SLEDEvents, SLEDPatterns,
+ * Creates the SEVEN SharePoint lists that back the SLED Use Case Library app:
+ *   SLEDIndustries, SLEDVerticals, SLEDUseCases, SLEDEvents, SLEDPatterns,
  *   SLEDAccelerators, SLEDAuditLog
  * …plus one document LIBRARY, SLEDSolutionArchitecture, that holds uploaded
  * architecture artifacts (one folder per use case, named by UseCaseId).
@@ -57,17 +57,53 @@
   const N = (name, display, lines = 6) =>
     `<Field Type="Note" DisplayName="${xml(display)}" Name="${xml(name)}" NumLines="${lines}" RichText="FALSE"/>`;
 
-  // --- The six lists --------------------------------------------------------
+  // --- The lists ------------------------------------------------------------
   // Each column: [internalName, displayName, kind]  kind: 'Text' | 'Note'
   // The Title column is reused (renamed via titleAs) — NOT recreated here.
+  // Approval-workflow columns (shared by Industries, Verticals, Use Cases):
+  const APPROVAL_COLS = [
+    ['ApprovalStatus', 'Approval Status', 'Text'],
+    ['SubmittedByName', 'Submitted By Name', 'Text'],
+    ['SubmittedAtText', 'Submitted At Text', 'Text'],
+    ['ReviewedByName', 'Reviewed By Name', 'Text'],
+    ['ReviewedAtText', 'Reviewed At Text', 'Text'],
+    ['ReviewNote', 'Review Note', 'Note']
+  ];
   const LISTS = [
     {
       title: 'SLEDIndustries', titleAs: 'Industry Name', index: ['IndustryId'],
       cols: [
         ['IndustryId', 'Industry Id', 'Text'],
-        ['Segment', 'Segment', 'Text'],
         ['Description', 'Description', 'Note'],
         ['RecordStatus', 'Record Status', 'Text'],
+        ...APPROVAL_COLS,
+        ['CreatedByName', 'Created By Name', 'Text'],
+        ['CreatedAtText', 'Created At Text', 'Text'],
+        ['ModifiedByName', 'Modified By Name', 'Text'],
+        ['ModifiedAtText', 'Modified At Text', 'Text']
+      ]
+    },
+    {
+      title: 'SLEDVerticals', titleAs: 'Vertical Name', index: ['VerticalId', 'IndustryId'],
+      cols: [
+        ['VerticalId', 'Vertical Id', 'Text'],
+        ['IndustryId', 'Industry Id', 'Text'],
+        ['Description', 'Description', 'Note'],
+        ['RecordStatus', 'Record Status', 'Text'],
+        ...APPROVAL_COLS,
+        ['CreatedByName', 'Created By Name', 'Text'],
+        ['CreatedAtText', 'Created At Text', 'Text'],
+        ['ModifiedByName', 'Modified By Name', 'Text'],
+        ['ModifiedAtText', 'Modified At Text', 'Text']
+      ]
+    },
+    {
+      title: 'SLEDSolutionPlays', titleAs: 'Solution Play Name', index: ['SolutionPlayId'],
+      cols: [
+        ['SolutionPlayId', 'Solution Play Id', 'Text'],
+        ['Description', 'Description', 'Note'],
+        ['RecordStatus', 'Record Status', 'Text'],
+        ...APPROVAL_COLS,
         ['CreatedByName', 'Created By Name', 'Text'],
         ['CreatedAtText', 'Created At Text', 'Text'],
         ['ModifiedByName', 'Modified By Name', 'Text'],
@@ -80,7 +116,7 @@
       cols: [
         ['UseCaseId', 'Use Case Id', 'Text'],
         ['IndustryId', 'Industry Id', 'Text'],
-        ['Segment', 'Segment', 'Text'],
+        ['VerticalId', 'Vertical Id', 'Text'],
         ['UCStatus', 'Status', 'Text'],
         ['BusinessProblem', 'Business Problem', 'Note'],
         ['CurrentProcess', 'Current Process', 'Note'],
@@ -106,6 +142,7 @@
         ['ReferenceUrl', 'Reference URL', 'Text'],
         ['RepoUrl', 'Repo URL', 'Text'],
         ['RecordStatus', 'Record Status', 'Text'],
+        ...APPROVAL_COLS,
         ['CreatedByName', 'Created By Name', 'Text'],
         ['CreatedAtText', 'Created At Text', 'Text'],
         ['ModifiedByName', 'Modified By Name', 'Text'],
@@ -142,6 +179,7 @@
         ['Components', 'Components', 'Note'],
         ['AcceleratorIds', 'Accelerator Ids', 'Note'],
         ['RecordStatus', 'Record Status', 'Text'],
+        ...APPROVAL_COLS,
         ['CreatedByName', 'Created By Name', 'Text'],
         ['CreatedAtText', 'Created At Text', 'Text'],
         ['ModifiedByName', 'Modified By Name', 'Text'],
@@ -154,7 +192,13 @@
         ['AcceleratorId', 'Accelerator Id', 'Text'],
         ['AccType', 'Type', 'Text'],
         ['PatternId', 'Pattern Id', 'Text'],
-        ['Url', 'URL', 'Text']
+        ['Url', 'URL', 'Text'],
+        ['RecordStatus', 'Record Status', 'Text'],
+        ...APPROVAL_COLS,
+        ['CreatedByName', 'Created By Name', 'Text'],
+        ['CreatedAtText', 'Created At Text', 'Text'],
+        ['ModifiedByName', 'Modified By Name', 'Text'],
+        ['ModifiedAtText', 'Modified At Text', 'Text']
       ]
     },
     {
@@ -323,6 +367,6 @@
 
   log('==================================================');
   log(`Done. Lists created: ${listsCreated}, fields added: ${fieldsAdded}, indexed: ${indexed}, errors: ${errors}`);
-  if (errors === 0) log('All six lists + the document library are ready. Next: deploy the app to SiteAssets/sled/ and open index.aspx (see PHASE-2-PROTOTYPE-RUNBOOK.md).');
+  if (errors === 0) log('All seven lists + the document library are ready. Next: deploy the app to SiteAssets/sled/ and open index.aspx (see PHASE-2-PROTOTYPE-RUNBOOK.md).');
   else warn('Finished with some errors — review the messages above.');
 })();

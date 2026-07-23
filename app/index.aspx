@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SLED Use Case Library</title>
-  <link rel="stylesheet" href="css/styles.css?v=4" />
+  <link rel="stylesheet" href="css/styles.css?v=5" />
 </head>
 <body>
   <header class="topbar">
@@ -18,8 +18,10 @@
         <a href="#/home" data-route="home">Home</a>
         <a href="#/usecases" data-route="usecases">Use Cases</a>
         <a href="#/industries" data-route="industries">Industries</a>
-        <a href="#/events" data-route="events">Events</a>
+        <a href="#/solutionplays" data-route="solutionplays">Solution Plays</a>
         <a href="#/patterns" data-route="patterns">Patterns</a>
+        <a href="#/events" data-route="events">Events</a>
+        <a href="#/approvals" data-route="approvals" style="display:none">Approvals</a>
         <a href="#/audit" data-route="audit">Audit</a>
         <a href="#/about" data-route="about">About</a>
         <div class="nav-dropdown" id="registerMenu">
@@ -27,9 +29,11 @@
           <div class="nav-dd-panel" role="menu">
             <a href="#/register" role="menuitem" class="nav-dd-head">Register &amp; Capture hub</a>
             <a href="#/register/usecase" role="menuitem">Register a Use Case</a>
-            <a href="#/register/industry" role="menuitem">Register an Industry</a>
-            <a href="#/register/event" role="menuitem">Add an Event</a>
+            <a href="#/register/solutionplay" role="menuitem">Register a Solution Play</a>
             <a href="#/register/pattern" role="menuitem">Reusable Pattern / Solution accelerator</a>
+            <a href="#/register/industry" role="menuitem">Register an Industry</a>
+            <a href="#/register/vertical" role="menuitem">Register a Vertical</a>
+            <a href="#/register/event" role="menuitem">Add an Event</a>
           </div>
         </div>
       </nav>
@@ -44,6 +48,6 @@
     <span>SLED Use Case Library &mdash; internal Microsoft catalog of reusable SLED use cases. Prototype &middot; <a href="#/about" style="color:inherit;text-decoration:underline">About</a></span>
   </footer>
 
-  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/app.js?v=10"></script>
 </body>
 </html>

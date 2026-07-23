@@ -1,35 +1,18 @@
 // constants.js — SLED choice sets and the canonical column maps shared by the
 // local store and the SharePoint adapter. Keeping the value sets here means the
 // forms, filters, seed data and list provisioning all agree on the same options.
+//
+// NOTE: Industries and their Verticals are NO LONGER hardcoded here — they are
+// data-driven records (see the Industries + Verticals lists / seed data) so new
+// industries and verticals can be added at runtime without a code change.
 
-// The five SLED industry verticals (fixed lookup).
-export const VERTICALS = [
-  'State & Local Government',
-  'Public Safety & Justice',
-  'Public Health & Social Services',
-  'Transportation & Urban Infrastructure',
-  'Education'
-];
+// Approval workflow states. Content created/edited by a Contributor is held as
+// 'Pending' until an Owner/Approver (Curator) approves it. Curator changes and
+// seed data are 'Approved' immediately.
+export const APPROVAL_STATUS = ['Approved', 'Pending', 'Rejected'];
 
-// Government / organisation segments a use case may target.
-export const SEGMENTS = [
-  'State Agency',
-  'County Government',
-  'City / Municipality',
-  'K-12 School District',
-  'Higher Education Institution',
-  'Special District / Regional Authority'
-];
-
-// Microsoft solution plays relevant to SLED.
-export const SOLUTION_PLAYS = [
-  'Modernize Government Operations',
-  'Citizen & Constituent Engagement',
-  'Public Safety & Justice Modernization',
-  'Data & AI for Public Sector',
-  'Power Business Decisions with Cloud Scale Analytics',
-  'Secure Government'
-];
+// Microsoft solution plays are now a data-driven, registrable entity (see the
+// Solution Plays list / seed data) — no longer a hardcoded choice set here.
 
 // Lifecycle status that replaces the old hackathon scoring band.
 export const STATUSES = ['Draft', 'In Review', 'Published'];

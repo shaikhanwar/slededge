@@ -30,6 +30,8 @@ export const SP_CONFIG = {
 // Logical list keys -> internal name suffix (prefix is applied via listName()).
 export const LISTS = {
   industries: 'Industries',
+  verticals: 'Verticals',
+  solutionPlays: 'SolutionPlays',
   useCases: 'UseCases',
   events: 'Events',
   patterns: 'Patterns',

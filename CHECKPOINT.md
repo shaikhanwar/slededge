@@ -1,7 +1,7 @@
 # SLEDEdge Checkpoint — SLED Use Case Library
 
 **Purpose:** Crash-recovery handoff so this work can resume on any machine (incl. a fresh VM) with full context.
-**Last updated:** 2026-06-30
+**Last updated:** 2026-07-08
 **Active track:** `SLEDEdge/` (this folder). The Hackathon Content Library in `hackathon-content-library/` is the **reference** solution this is modelled on; it is a separate, completed solution.
 
 ---
@@ -152,3 +152,39 @@ Lists kept in sync: [lists/sled-list-schema.json](lists/sled-list-schema.json) a
 - **Deploy to the DEV SharePoint site** — runbook §1–§3 (create site + allow custom script + provision the six lists), then §7–§8 (upload `app/` to `SiteAssets/sled`, surface in nav), then §6 round-trip validation. The lists/provisioning script is already updated for the simplified UseCases columns.
 - Optional polish: tidy the now-unused legacy `.browse/.facets/.savedviews` rules and the dead `/* Pipeline funnel */` block in [app/css/styles.css](app/css/styles.css) (harmless, left in place).
 - The browser tab may be cached — hard-reload (append `?v=N` to the URL) when re-verifying.
+
+---
+
+## 8. Session log — 2026-07-08 (GitHub publish, docs, demo data seeded to SharePoint)
+
+### GitHub repository
+- Published `SLEDEdge/` to **https://github.com/shaikhanwar/slededge** (branch `main`). Git was not installed on this machine — installed **Git for Windows** via winget; Git Credential Manager handled auth. Commit author: `shaikhanwar <shaikh.anwar@live.com>` (local repo config).
+- The repo root **is** the `SLEDEdge/` folder. The remote had an auto-generated `README.md` which was merged (kept ours).
+- **Not pushed / local only:** the `.pptx` deck (git-ignored) and all demo seed-data edits below — the user explicitly wanted demo data kept out of git.
+
+### Docs authored (in repo)
+- [README.md](README.md) — made **self-contained**: inlined the flow diagrams, full step-by-step SharePoint deployment, and the modern-page embedding guide (plus a Table of Contents). The `docs/` files remain as standalone copies.
+- [docs/FLOW-DIAGRAM.md](docs/FLOW-DIAGRAM.md) — 4 Mermaid diagrams (component architecture, DEV/PROD host-detection flow, approval sequence, DEV→PROD deployment).
+- [docs/SHAREPOINT-DEPLOYMENT.md](docs/SHAREPOINT-DEPLOYMENT.md) — 9-step deploy guide + troubleshooting.
+- [docs/EMBED-IN-MODERN-PAGES.md](docs/EMBED-IN-MODERN-PAGES.md) — Embed web part / iframe guidance.
+- New docs use generic `https://<tenant>.sharepoint.com` placeholders. **Note:** the older phase docs (`CHECKPOINT.md`, `PHASE-1`, `PHASE-2`) still contain the real `vw4gr` tenant URLs — scrub if the repo must be fully sanitized.
+
+### Demo data added (from the FY26 CAF deck, `FY26 Results & FY27 CAF Strategy (1).pptx`)
+All seed edits are **local only** (in `app/data/`), not committed:
+- **Use Cases** — added `UC-007`…`UC-013` (NYC AI Hackathon, Louisiana OTS App-in-a-Day, Florida App/AI-in-a-Day, NYC legacy app-mod, NYC workflow automation, NYC resident chatbots, NYC NL dashboards). All fields populated; each links to a pattern (`patternId`) and has demo owner + reference/repo URLs. Total now **13** use cases in [app/data/usecases.json](app/data/usecases.json) (top key is `useCases`).
+- **Patterns** — added `PAT-003`…`PAT-007`; **Accelerators** — added `ACC-003`…`ACC-009`, in [app/data/patterns.json](app/data/patterns.json). Totals: **7 patterns / 9 accelerators**.
+- **Events** — added `EV-004`…`EV-009` (the hackathons + honorable mentions) in [app/data/events.json](app/data/events.json). Total **9** events. *(Not seeded to SharePoint — see below.)*
+
+### Seeded to the LIVE SharePoint lists (scope: Use Cases, Patterns, Accelerators only)
+- Built a one-paste browser-console seeder: [lists/seed-sled-data-browser.js](lists/seed-sled-data-browser.js). It embeds the seed JSON, resolves the site from the page URL, gets a form digest, and POSTs to `SLEDUseCases` / `SLEDPatterns` / `SLEDAccelerators` over same-origin REST as the signed-in user. **Idempotent** (skips records whose `UseCaseId`/`PatternId`/`AcceleratorId` already exists). Column mapping mirrors [app/js/store.js](app/js/store.js) `MAPS`.
+- **Bug fixed mid-run:** first paste created 7 patterns + 9 accelerators but **0 use cases** because the script read `UC.usecases` while the file key is `useCases`. Fixed to `UC.useCases || UC.usecases` (line ~294). Second paste created the 13 use cases.
+- **User confirmed the test data was added successfully** on `https://vw4gr.sharepoint.com/sites/SLEDUseCaseLibrary`.
+
+### Environment facts learned (this machine)
+- **PowerShell 7 (`pwsh`) is NOT installed** — only Windows PowerShell 5.1. Run `serve.ps1` with `powershell -File .\serve.ps1 -Port 8087` (the `HttpListener` `Add-Type` warning is harmless; the server still starts). `node` is also not installed.
+- Local preview server was left running during the session on port 8087 — **stopped at end of session.**
+
+### Pick up next
+- Optional: seed **Events** (`EV-004…009`) to SharePoint too — extend the seeder's `MAPS` with a `SLEDEvents` entry (columns per `store.js` MAPS `events`).
+- Optional: sanitize the older phase docs (remove `vw4gr` tenant references) if the public repo should be fully generic.
+- Optional: replace the generic seed records `UC-001…006` with real content, or delete them from the lists.

@@ -1,0 +1,10 @@
+{
+  "solutionPlays": [
+    { "id": "PLAY-001", "name": "Modernize Government Operations", "description": "Streamline back-office and mission operations with cloud and AI.", "approvalStatus": "Approved", "createdBy": "Seed", "createdAt": "2026-05-03T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-03T12:00:00.000Z" },
+    { "id": "PLAY-002", "name": "Citizen & Constituent Engagement", "description": "Deliver responsive, accessible, self-service experiences for residents.", "approvalStatus": "Approved", "createdBy": "Seed", "createdAt": "2026-05-03T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-03T12:00:00.000Z" },
+    { "id": "PLAY-003", "name": "Public Safety & Justice Modernization", "description": "Improve outcomes across law enforcement, courts, and emergency response.", "approvalStatus": "Approved", "createdBy": "Seed", "createdAt": "2026-05-03T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-03T12:00:00.000Z" },
+    { "id": "PLAY-004", "name": "Data & AI for Public Sector", "description": "Unlock insight and automation with data platforms and AI.", "approvalStatus": "Approved", "createdBy": "Seed", "createdAt": "2026-05-03T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-03T12:00:00.000Z" },
+    { "id": "PLAY-005", "name": "Power Business Decisions with Cloud Scale Analytics", "description": "Enable real-time, self-service analytics over a governed data estate.", "approvalStatus": "Approved", "createdBy": "Seed", "createdAt": "2026-05-03T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-03T12:00:00.000Z" },
+    { "id": "PLAY-006", "name": "Secure Government", "description": "Protect the digital estate with zero-trust security and compliance.", "approvalStatus": "Approved", "createdBy": "Seed", "createdAt": "2026-05-03T12:00:00.000Z", "modifiedBy": "Seed", "modifiedAt": "2026-05-03T12:00:00.000Z" }
+  ]
+}

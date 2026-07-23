@@ -9,3 +9,6 @@ Thumbs.db
 
 # Node (not used by the app, but just in case)
 node_modules/
+
+# Internal source decks (do not publish)
+*.pptx

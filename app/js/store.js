@@ -12,11 +12,21 @@
 // mapping round-trips with no type friction and provisioning stays simple.
 
 import {
-  buildIndustry, buildUseCase, buildEvent, buildPattern, buildAccelerator
+  buildIndustry, buildVertical, buildSolutionPlay, buildUseCase, buildEvent, buildPattern, buildAccelerator
 } from './factory.js';
 import { resolveSiteUrl, listName, SP_CONFIG } from './spconfig.js';
 
-const LOCAL_KEY = 'sled.library.v1';
+const LOCAL_KEY = 'sled.library.v2';
+
+// Approval workflow columns shared by Industries, Verticals and Use Cases.
+const APPROVAL_COLS = [
+  ['ApprovalStatus', 'approvalStatus', 'text'],
+  ['SubmittedByName', 'submittedBy', 'text'],
+  ['SubmittedAtText', 'submittedAt', 'text'],
+  ['ReviewedByName', 'reviewedBy', 'text'],
+  ['ReviewedAtText', 'reviewedAt', 'text'],
+  ['ReviewNote', 'reviewNote', 'text']
+];
 
 // ---- Column maps ----------------------------------------------------------
 // kind: 'text' (string), 'list' (array <-> "; " text), 'bool' (boolean <-> Yes/No)
@@ -27,9 +37,38 @@ const MAPS = {
     cols: [
       ['Title', 'name', 'text', true],
       ['IndustryId', 'id', 'text'],
-      ['Segment', 'segment', 'text'],
       ['Description', 'description', 'text'],
       ['RecordStatus', 'recordStatus', 'text'],
+      ...APPROVAL_COLS,
+      ['CreatedByName', 'createdBy', 'text'],
+      ['CreatedAtText', 'createdAt', 'text'],
+      ['ModifiedByName', 'modifiedBy', 'text'],
+      ['ModifiedAtText', 'modifiedAt', 'text']
+    ]
+  },
+  verticals: {
+    list: 'verticals', key: 'VerticalId', build: buildVertical,
+    cols: [
+      ['Title', 'name', 'text', true],
+      ['VerticalId', 'id', 'text'],
+      ['IndustryId', 'industryId', 'text'],
+      ['Description', 'description', 'text'],
+      ['RecordStatus', 'recordStatus', 'text'],
+      ...APPROVAL_COLS,
+      ['CreatedByName', 'createdBy', 'text'],
+      ['CreatedAtText', 'createdAt', 'text'],
+      ['ModifiedByName', 'modifiedBy', 'text'],
+      ['ModifiedAtText', 'modifiedAt', 'text']
+    ]
+  },
+  solutionPlays: {
+    list: 'solutionPlays', key: 'SolutionPlayId', build: buildSolutionPlay,
+    cols: [
+      ['Title', 'name', 'text', true],
+      ['SolutionPlayId', 'id', 'text'],
+      ['Description', 'description', 'text'],
+      ['RecordStatus', 'recordStatus', 'text'],
+      ...APPROVAL_COLS,
       ['CreatedByName', 'createdBy', 'text'],
       ['CreatedAtText', 'createdAt', 'text'],
       ['ModifiedByName', 'modifiedBy', 'text'],
@@ -42,7 +81,7 @@ const MAPS = {
       ['Title', 'title', 'text', true],
       ['UseCaseId', 'id', 'text'],
       ['IndustryId', 'industryId', 'text'],
-      ['Segment', 'segment', 'text'],
+      ['VerticalId', 'verticalId', 'text'],
       ['UCStatus', 'status', 'text'],
       ['BusinessProblem', 'businessProblem', 'text'],
       ['CurrentProcess', 'currentProcess', 'text'],
@@ -68,6 +107,7 @@ const MAPS = {
       ['ReferenceUrl', 'referenceUrl', 'text'],
       ['RepoUrl', 'repoUrl', 'text'],
       ['RecordStatus', 'recordStatus', 'text'],
+      ...APPROVAL_COLS,
       ['CreatedByName', 'createdBy', 'text'],
       ['CreatedAtText', 'createdAt', 'text'],
       ['ModifiedByName', 'modifiedBy', 'text'],
@@ -106,6 +146,7 @@ const MAPS = {
       ['Components', 'components', 'list'],
       ['AcceleratorIds', 'acceleratorIds', 'list'],
       ['RecordStatus', 'recordStatus', 'text'],
+      ...APPROVAL_COLS,
       ['CreatedByName', 'createdBy', 'text'],
       ['CreatedAtText', 'createdAt', 'text'],
       ['ModifiedByName', 'modifiedBy', 'text'],
@@ -119,7 +160,13 @@ const MAPS = {
       ['AcceleratorId', 'id', 'text'],
       ['AccType', 'type', 'text'],
       ['PatternId', 'patternId', 'text'],
-      ['Url', 'url', 'text']
+      ['Url', 'url', 'text'],
+      ['RecordStatus', 'recordStatus', 'text'],
+      ...APPROVAL_COLS,
+      ['CreatedByName', 'createdBy', 'text'],
+      ['CreatedAtText', 'createdAt', 'text'],
+      ['ModifiedByName', 'modifiedBy', 'text'],
+      ['ModifiedAtText', 'modifiedAt', 'text']
     ]
   },
   audit: {
@@ -164,13 +211,15 @@ function rowToRecord(map, row) {
 // ---- Local backend (seed JSON + localStorage) -----------------------------
 const SEED_FILES = {
   industries: 'data/industries.json',
+  verticals: 'data/verticals.json',
+  solutionPlays: 'data/solutionplays.json',
   useCases: 'data/usecases.json',
   events: 'data/events.json',
   patterns: 'data/patterns.json'
 };
 
 function emptyDb() {
-  return { industries: [], useCases: [], events: [], patterns: [], accelerators: [], audit: [] };
+  return { industries: [], verticals: [], solutionPlays: [], useCases: [], events: [], patterns: [], accelerators: [], audit: [] };
 }
 
 async function loadSeed() {
@@ -213,7 +262,7 @@ export async function loadLocal() {
 export function saveLocal(db) {
   try {
     localStorage.setItem(LOCAL_KEY, JSON.stringify({
-      industries: db.industries, useCases: db.useCases, events: db.events,
+      industries: db.industries, verticals: db.verticals, solutionPlays: db.solutionPlays, useCases: db.useCases, events: db.events,
       patterns: db.patterns, accelerators: db.accelerators, audit: db.audit
     }));
     return true;

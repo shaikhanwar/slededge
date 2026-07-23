@@ -97,9 +97,17 @@ async function loadSharePointIdentity() {
   const isCuratorGroup = groups.some(t => /curator|owner/i.test(t));
   const isMemberGroup = groups.some(t => /member|contribut/i.test(t));
 
-  let resolved = 'viewer';
-  if (me.IsSiteAdmin || isCuratorGroup || permHas(perms, MANAGE_LISTS)) resolved = 'curator';
-  else if (isMemberGroup || permHas(perms, ADD_LIST_ITEMS)) resolved = 'contributor';
+  // Group membership is authoritative when the user is in a recognizable SLED
+  // group. The permission probe is only a FALLBACK for users who aren't in one.
+  // (Important: the default SharePoint "Members" group has the *Edit* level,
+  // which includes Manage Lists — so probing permissions first would wrongly
+  // promote every Member to Curator and skip the approval workflow.)
+  let resolved;
+  if (me.IsSiteAdmin || isCuratorGroup) resolved = 'curator';
+  else if (isMemberGroup) resolved = 'contributor';
+  else if (permHas(perms, MANAGE_LISTS)) resolved = 'curator';
+  else if (permHas(perms, ADD_LIST_ITEMS)) resolved = 'contributor';
+  else resolved = 'viewer';
 
   IDENTITY = {
     name: me.Title || me.Email || 'User',
@@ -137,18 +145,21 @@ export function isOwner(record) {
 }
 
 // Can the current user create a record of this kind?
-//   useCase ⇒ contributor or curator. Everything else ⇒ curator only.
+//   useCase / pattern / accelerator / solutionPlay ⇒ contributor or curator
+//   (contributor items go to the approval queue). Everything else (industry,
+//   vertical, event) ⇒ curator only.
 export function canCreate(kind) {
   if (isViewer()) return false;
-  if (kind === 'useCase') return true;
+  if (kind === 'useCase' || kind === 'pattern' || kind === 'accelerator' || kind === 'solutionPlay') return true;
   return isCurator();
 }
 
 // Can the current user edit/archive this record?
-//   use cases: curator, or contributor who owns it. Others: curator only.
+//   use cases + patterns + solution plays: curator, or contributor who owns it.
+//   Others: curator only.
 export function canEdit(kind, record) {
   if (isCurator()) return true;
-  if (kind === 'useCase') return isContributor() && isOwner(record);
+  if (kind === 'useCase' || kind === 'pattern' || kind === 'solutionPlay') return isContributor() && isOwner(record);
   return false;
 }
 
@@ -158,6 +169,9 @@ export const canUpload = (kind, record) => canEdit(kind, record);
 // Managing the shared taxonomy (industries, patterns, accelerators, events).
 export const canManageTaxonomy = () => isCurator();
 export const canManageEvents = () => isCurator();
+
+// Only Owners/Approvers (curators) review and approve/reject pending submissions.
+export const canApprove = () => isCurator();
 
 export function roleLabel() {
   return { viewer: 'Viewer', contributor: 'Contributor', curator: 'Curator' }[IDENTITY.role] || 'Viewer';

@@ -9,7 +9,7 @@ consent, no F12 browser console**). Everything else is done in the browser.
 > own tenant root and site. This guide uses a site named `SLEDUseCaseLibrary` as
 > the example.
 
-**What you'll end up with:** six `SLED*` lists + one document library → the app at
+**What you'll end up with:** seven `SLED*` lists + one document library → the app at
 `…/SiteAssets/sled/index.aspx`, whose own pages browse, register and edit every
 entity and write back to the lists over same-origin REST.
 
@@ -67,9 +67,9 @@ script to be **allowed** on the site.
 
 ---
 
-## Step 3 — Provision the six lists
+## Step 3 — Provision the lists
 
-Creates the six `SLED*` lists (plain Text/Note columns — the app stores booleans
+Creates the seven `SLED*` lists (plain Text/Note columns — the app stores booleans
 as `Yes`/`No` and multi-values as `; `-joined text) plus the
 `SLEDSolutionArchitecture` document library. Uses **Site Designs / Site Scripts**
 through the management shell. Each column is declared with an explicit Field XML
@@ -96,10 +96,10 @@ pwsh -File ./provision-sled-via-sitedesign.ps1 `
 
 Expected tail: `Lists OK: 6 | failed: 0` → `Done.`
 
-**Verify (GUI):** **Site contents** shows `SLEDIndustries`, `SLEDUseCases`,
-`SLEDEvents`, `SLEDPatterns`, `SLEDAccelerators`, `SLEDAuditLog`, and the
+**Verify (GUI):** **Site contents** shows `SLEDIndustries`, `SLEDVerticals`,
+`SLEDUseCases`, `SLEDEvents`, `SLEDPatterns`, `SLEDAccelerators`, `SLEDAuditLog`, and the
 `SLEDSolutionArchitecture` library. Column *internal* names are **unprefixed**
-(e.g. `IndustryId`, `BusinessProblem`) — the app addresses them by those exact
+(e.g. `IndustryId`, `VerticalId`, `BusinessProblem`) — the app addresses them by those exact
 names.
 
 > **Alternative (no admin shell):** paste
@@ -189,7 +189,7 @@ see [EMBED-IN-MODERN-PAGES.md](EMBED-IN-MODERN-PAGES.md).
 1. **Register:** open the app → **+ Register → Register a Use Case** → pick an
    Industry, fill the form → **Create use case**. Confirm it appears in **Use
    Cases** and writes back to `SLEDUseCases`.
-2. **Browse/filter:** try the Industry / Segment / Status filters and search.
+2. **Browse/filter:** try the Industry / Vertical / Status filters and search.
 3. **Detail tabs:** open a use case → check Overview / Solution & Tech / Value &
    Impact / Owner & Artifacts.
 4. **Industries / Events / Patterns:** confirm each lists its records; register

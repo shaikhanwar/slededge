@@ -26,16 +26,59 @@ function auditFields(p = {}) {
   };
 }
 
-// ---- Industry (replaces the HCL Agency) -----------------------------------
-// A fixed lookup of the SLED verticals. Simple record: name + segment +
-// description. Use cases link to one Industry by id.
+// ---- Approval (Contributor submissions await Owner/Approver review) --------
+// Seed and curator-created records default to 'Approved' so nothing is hidden
+// on first load. Contributor create/edit flips this to 'Pending' (see app.js).
+function approvalFields(p = {}) {
+  return {
+    approvalStatus: str(p.approvalStatus, 'Approved'),
+    submittedBy: str(p.submittedBy),
+    submittedAt: str(p.submittedAt),
+    reviewedBy: str(p.reviewedBy),
+    reviewedAt: str(p.reviewedAt),
+    reviewNote: str(p.reviewNote)
+  };
+}
+
+// ---- Industry (top of the SLED taxonomy) ----------------------------------
+// A data-driven record: name + description. Verticals hang off an Industry
+// (one-to-many) and use cases link to one Industry + one Vertical by id.
 export function buildIndustry(p = {}) {
   return {
     id: p.id || nextId('IND-NEW'),
     name: str(p.name, 'Untitled Industry'),
-    segment: str(p.segment),
     description: str(p.description),
     recordStatus: str(p.recordStatus, 'Active'),
+    ...approvalFields(p),
+    ...auditFields(p)
+  };
+}
+
+// ---- Vertical (child of an Industry) --------------------------------------
+// The former "Segment" concept, promoted to its own registrable record so new
+// verticals can be added under any industry at runtime.
+export function buildVertical(p = {}) {
+  return {
+    id: p.id || nextId('VER-NEW'),
+    name: str(p.name, 'Untitled Vertical'),
+    industryId: p.industryId || null,
+    description: str(p.description),
+    recordStatus: str(p.recordStatus, 'Active'),
+    ...approvalFields(p),
+    ...auditFields(p)
+  };
+}
+
+// ---- Solution Play (data-driven choice; was a hardcoded list) --------------
+// A registrable record so new solution plays can be added/updated at runtime.
+// Use cases + patterns store the play by NAME (kept simple, no FK migration).
+export function buildSolutionPlay(p = {}) {
+  return {
+    id: p.id || nextId('PLAY-NEW'),
+    name: str(p.name, 'Untitled Solution Play'),
+    description: str(p.description),
+    recordStatus: str(p.recordStatus, 'Active'),
+    ...approvalFields(p),
     ...auditFields(p)
   };
 }
@@ -51,6 +94,7 @@ export function buildPattern(p = {}) {
     components: list(p.components),
     acceleratorIds: arr(p.acceleratorIds),
     recordStatus: str(p.recordStatus, 'Active'),
+    ...approvalFields(p),
     ...auditFields(p)
   };
 }
@@ -61,7 +105,10 @@ export function buildAccelerator(p = {}) {
     name: str(p.name, 'Untitled Accelerator'),
     type: str(p.type, 'Solution accelerator'),
     patternId: p.patternId || null,
-    url: str(p.url, '#')
+    url: str(p.url, '#'),
+    recordStatus: str(p.recordStatus, 'Active'),
+    ...approvalFields(p),
+    ...auditFields(p)
   };
 }
 
@@ -90,7 +137,7 @@ export function buildUseCase(p = {}) {
     id: p.id || nextId('UC-NEW'),
     title: str(p.title, 'Untitled Use Case'),
     industryId: p.industryId || null,
-    segment: str(p.segment),
+    verticalId: p.verticalId || null,
     status: str(p.status, 'Draft'),
     // Overview
     businessProblem: str(p.businessProblem),
@@ -121,6 +168,7 @@ export function buildUseCase(p = {}) {
     referenceUrl: str(p.referenceUrl, '#'),
     repoUrl: str(p.repoUrl, '#'),
     recordStatus: str(p.recordStatus, 'Active'),
+    ...approvalFields(p),
     ...auditFields(p)
   };
 }
