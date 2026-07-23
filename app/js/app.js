@@ -939,20 +939,26 @@ function pageAbout() {
         <tr><th>Hosting</th><td>SharePoint Online (SiteAssets) — portable across sites</td></tr>
       </tbody></table>
       <h3 style="margin-top:22px">Owners &amp; contacts</h3>
-      <table class="tbl"><tbody>
-        <tr>
-          <td><strong>Orry Young</strong><br><span class="dim tiny">Sr GTM Mgr · AMS SE&amp;O_ATU SE_US1010</span></td>
-          <td><a href="mailto:youngorry@microsoft.com">youngorry@microsoft.com</a></td>
-        </tr>
-        <tr>
-          <td><strong>Anwar Shaikh</strong><br><span class="dim tiny">Sr Cloud Solution Architect · US SLED CSU Cloud AI</span></td>
-          <td><a href="mailto:shaikhanwar@microsoft.com">shaikhanwar@microsoft.com</a></td>
-        </tr>
-        <tr>
-          <td><strong>Jennifer Meidl</strong><br><span class="dim tiny">Dir CSA · US SLED CSU Cloud AI</span></td>
-          <td><a href="mailto:Jennifer.Meidl@microsoft.com">Jennifer.Meidl@microsoft.com</a></td>
-        </tr>
-      </tbody></table>
+      <div class="contact-grid">
+        <div class="contact-sig">
+          <div class="contact-name">Orry Young</div>
+          <div class="contact-title">Sr. GTM Mgr</div>
+          <div class="contact-org">AMS SE&amp;O_ATU SE_US1010</div>
+          <div class="contact-email">Email : <a href="mailto:youngorry@microsoft.com">youngorry@microsoft.com</a></div>
+        </div>
+        <div class="contact-sig">
+          <div class="contact-name">Jennifer Meidl</div>
+          <div class="contact-title">Dir CSA</div>
+          <div class="contact-org">US SLED CSU Cloud AI</div>
+          <div class="contact-email">Email : <a href="mailto:Jennifer.Meidl@microsoft.com">Jennifer.Meidl@microsoft.com</a></div>
+        </div>
+        <div class="contact-sig">
+          <div class="contact-name">Anwar Shaikh</div>
+          <div class="contact-title">Sr. Cloud Solution Architect</div>
+          <div class="contact-org">US SLED CSU Cloud AI</div>
+          <div class="contact-email">Email : <a href="mailto:shaikhanwar@microsoft.com">shaikhanwar@microsoft.com</a></div>
+        </div>
+      </div>
     </div></div>`);
 }
 
